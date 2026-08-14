@@ -1,0 +1,1092 @@
+<title>Audii</title>
+<style>
+  /* ===================================================================
+     Landing Audii.
+     Les couleurs et la police ne sont pas réinventées ici : ce sont les
+     jetons de `src/renderer/src/styles/app.css`, recopiés à l'identique,
+     pour que la page et l'application soient la même marque.
+     =================================================================== */
+
+  @font-face {
+    font-family: 'Inter Variable';
+    src: url(data:font/woff2;base64,__FONT__) format('woff2-variations');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  /* Sombre par défaut : c'est le thème d'Audii. */
+  :root {
+    --bg: #0b0910;
+    --bg-panel: #141119;
+    --bg-elevated: #1c1825;
+    --text: #ffffff;
+    --text-soft: #c9c4d4;
+    --text-dim: #8f8a9c;
+    --text-mute: #6b6678;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --accent: #a855f7;
+    --accent-2: #6d28d9;
+    --pink: #ff2d8e;
+    --glass: rgba(28, 24, 37, 0.72);
+    --ghost: rgba(255, 255, 255, 0.05);
+    --pill-bg: #1c1825;
+    --pill-text: #ffffff;
+    --halo-1: rgba(168, 85, 247, 0.2);
+    --halo-2: rgba(255, 45, 142, 0.14);
+    --shadow: 0 40px 90px rgba(0, 0, 0, 0.62);
+    --font: 'Inter Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Thème clair : les jetons `[data-theme='light']` de l'application. */
+  :root:not([data-theme='dark']) {
+    @media (prefers-color-scheme: light) {
+      --bg: #f4f2f7;
+      --bg-panel: #ffffff;
+      --bg-elevated: #ffffff;
+      --text: #17131f;
+      --text-soft: #3d3650;
+      --text-dim: #665e78;
+      --text-mute: #8b8398;
+      --line: rgba(23, 19, 31, 0.1);
+      --line-strong: rgba(23, 19, 31, 0.18);
+      --accent: #7c3aed;
+      --accent-2: #5b21b6;
+      --pink: #e01a76;
+      --glass: rgba(255, 255, 255, 0.82);
+      --ghost: rgba(23, 19, 31, 0.05);
+      --pill-bg: #17131f;
+      --pill-text: #ffffff;
+      --halo-1: rgba(124, 58, 237, 0.14);
+      --halo-2: rgba(224, 26, 118, 0.1);
+      --shadow: 0 40px 90px rgba(40, 30, 60, 0.2);
+    }
+  }
+
+  :root[data-theme='light'] {
+    --bg: #f4f2f7;
+    --bg-panel: #ffffff;
+    --bg-elevated: #ffffff;
+    --text: #17131f;
+    --text-soft: #3d3650;
+    --text-dim: #665e78;
+    --text-mute: #8b8398;
+    --line: rgba(23, 19, 31, 0.1);
+    --line-strong: rgba(23, 19, 31, 0.18);
+    --accent: #7c3aed;
+    --accent-2: #5b21b6;
+    --pink: #e01a76;
+    --glass: rgba(255, 255, 255, 0.82);
+    --ghost: rgba(23, 19, 31, 0.05);
+    --pill-bg: #17131f;
+    --pill-text: #ffffff;
+    --halo-1: rgba(124, 58, 237, 0.14);
+    --halo-2: rgba(224, 26, 118, 0.1);
+    --shadow: 0 40px 90px rgba(40, 30, 60, 0.2);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--pink);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  /* ------------------------------------------------------------ scène */
+
+  .stage {
+    position: relative;
+    min-height: 100svh;
+    height: 100svh;
+    min-height: 780px;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  /* Halos de marque : le même dégradé que le splash de l'application. */
+  .stage::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background:
+      radial-gradient(78% 58% at 22% 8%, var(--halo-1) 0%, transparent 62%),
+      radial-gradient(64% 54% at 88% 78%, var(--halo-2) 0%, transparent 60%);
+  }
+
+  .ghost {
+    position: absolute;
+    z-index: -1;
+    top: 9%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: clamp(9rem, 21vw, 20rem);
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    line-height: 0.8;
+    color: var(--ghost);
+    white-space: nowrap;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  /* --------------------------------------------------------- en-tête */
+
+  .top {
+    position: absolute;
+    inset: 0 0 auto 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 40px;
+    padding: 26px 34px;
+    z-index: 6;
+  }
+
+  .tile {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+  }
+
+  .vertical {
+    position: absolute;
+    top: 96px;
+    left: 40px;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.42em;
+    color: var(--text-dim);
+  }
+
+  .nav {
+    display: flex;
+    gap: 30px;
+    margin-top: 13px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+  }
+
+  .nav a {
+    padding-bottom: 6px;
+    border-bottom: 1.5px solid transparent;
+    transition: color 0.18s ease, border-color 0.18s ease;
+  }
+
+  .nav a:hover {
+    color: var(--text);
+  }
+
+  .nav a.is-active {
+    color: var(--text);
+    border-bottom-color: var(--pink);
+  }
+
+  .top-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    height: 42px;
+    padding: 0 22px;
+    border-radius: 999px;
+    background: var(--pill-bg);
+    color: var(--pill-text);
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--line);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+  }
+
+  .pill.is-brand {
+    background: linear-gradient(135deg, var(--pink), var(--accent));
+    color: #fff;
+    border-color: transparent;
+  }
+
+  .square {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+  }
+
+  /* ----------------------------------------------------------- produit */
+
+  .shot {
+    position: absolute;
+    top: 15%;
+    left: 50%;
+    width: min(60vw, 880px);
+    transform: translateX(-50%);
+    border-radius: 14px;
+    border: 1px solid var(--line-strong);
+    box-shadow: var(--shadow);
+    display: block;
+    animation: float 9s ease-in-out infinite;
+    /* Le bas de la capture se dissout dans la page : le titre passe devant
+       le produit, comme dans la maquette, sans devenir illisible. */
+    -webkit-mask-image: linear-gradient(to bottom, #000 50%, transparent 88%);
+    mask-image: linear-gradient(to bottom, #000 50%, transparent 88%);
+  }
+
+  @keyframes float {
+    50% {
+      transform: translate(-50%, -13px);
+    }
+  }
+
+  /* Cartes flottantes en verre, posées sur le produit. */
+  .card {
+    position: absolute;
+    z-index: 4;
+    width: 224px;
+    padding: 13px 15px;
+    border-radius: 15px;
+    background: var(--glass);
+    border: 1px solid var(--line-strong);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  }
+
+  .card h3 {
+    margin: 0 0 5px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+
+  .card p {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
+
+  .card-vibe {
+    top: 21%;
+    right: 11%;
+  }
+
+  .card-stat {
+    top: 45%;
+    right: 6.5%;
+    width: 258px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 13px;
+  }
+
+  .stat-value {
+    grid-row: span 2;
+    align-self: center;
+    font-size: 27px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--pink), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .chips {
+    grid-column: 2;
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .chip {
+    display: grid;
+    place-items: center;
+    width: 27px;
+    height: 27px;
+    border-radius: 9px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+  }
+
+  /* ------------------------------------------------------------ titre */
+
+  .headline {
+    position: absolute;
+    top: 53%;
+    left: 5.4%;
+    z-index: 5;
+    margin: 0;
+    font-size: clamp(2.4rem, 5.1vw, 4.7rem);
+    font-weight: 900;
+    line-height: 0.94;
+    letter-spacing: -0.035em;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+
+  /* Voile derrière le titre : la capture reste visible, le blanc reste net. */
+  .headline::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: -30% -34% -46% -14%;
+    background: radial-gradient(52% 58% at 27% 52%, var(--bg) 0%, var(--bg) 32%, transparent 78%);
+  }
+
+  .slashes {
+    color: var(--pink);
+    letter-spacing: -0.09em;
+    margin-right: 0.12em;
+  }
+
+  /* Barres de repère, reprises de la maquette : un rythme, pas un décor. */
+  .ticks {
+    position: absolute;
+    top: 44%;
+    left: 2.4%;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .ticks i {
+    display: block;
+    width: 26px;
+    height: 1.5px;
+    background: var(--line-strong);
+  }
+
+  .ticks i:nth-child(3) {
+    width: 38px;
+    background: var(--pink);
+  }
+
+  /* ------------------------------------------------- index du carrousel */
+
+  .index {
+    position: absolute;
+    top: 42%;
+    right: 2.2%;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-mute);
+  }
+
+  .index button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+    color: inherit;
+    transition: color 0.18s ease;
+  }
+
+  .index button::before {
+    content: '';
+    width: 1.5px;
+    height: 11px;
+    background: transparent;
+    transition: background 0.18s ease;
+  }
+
+  .index button:hover {
+    color: var(--text-soft);
+  }
+
+  .index button[aria-current='true'] {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .index button[aria-current='true']::before {
+    background: var(--pink);
+  }
+
+  /* --------------------------------------------------- texte et appels */
+
+  .lede {
+    position: absolute;
+    top: 74%;
+    left: 40%;
+    z-index: 5;
+    width: min(34vw, 430px);
+  }
+
+  .rule {
+    width: 54px;
+    height: 1.5px;
+    background: var(--line-strong);
+    margin-bottom: 14px;
+  }
+
+  .lede p {
+    margin: 0 0 18px;
+    font-size: 12.8px;
+    line-height: 1.72;
+    color: var(--text-dim);
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .ghost-link {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-soft);
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.18s ease;
+  }
+
+  .ghost-link:hover {
+    border-bottom-color: var(--text-soft);
+  }
+
+  /* --------------------------------------------------------- colonnes */
+
+  .social {
+    position: absolute;
+    left: 2.2%;
+    bottom: 11%;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 6px;
+    border-radius: 16px;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+  }
+
+  .social a {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    color: var(--text-dim);
+    transition: background 0.16s ease, color 0.16s ease;
+  }
+
+  .social a:hover {
+    background: var(--bg-elevated);
+    color: var(--text);
+  }
+
+  .thumbs {
+    position: absolute;
+    left: 6.4%;
+    bottom: 3.4%;
+    z-index: 6;
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+  }
+
+  .thumb {
+    padding: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: var(--bg-panel);
+    opacity: 0.55;
+    transition: opacity 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  }
+
+  .thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .thumb:hover {
+    opacity: 0.85;
+    transform: translateY(-3px);
+  }
+
+  .thumb[aria-current='true'] {
+    opacity: 1;
+    border-color: var(--pink);
+    padding: 5px;
+    background: var(--bg-elevated);
+  }
+
+  .thumb[aria-current='true'] img {
+    border-radius: 8px;
+  }
+
+  .thumb.sm {
+    width: 92px;
+    height: 58px;
+  }
+
+  .thumb.lg {
+    width: 148px;
+    height: 94px;
+  }
+
+  .track {
+    position: absolute;
+    left: 6.4%;
+    bottom: 1.4%;
+    z-index: 6;
+    display: flex;
+    gap: 5px;
+  }
+
+  .track i {
+    display: block;
+    width: 34px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: var(--line-strong);
+    transition: background 0.2s ease;
+  }
+
+  .track i.is-on {
+    background: var(--pink);
+  }
+
+  .preview {
+    position: absolute;
+    right: 10%;
+    bottom: 5.4%;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    text-align: left;
+  }
+
+  .play {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    color: #fff;
+    background: linear-gradient(135deg, var(--pink), var(--accent));
+  }
+
+  .preview strong {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+
+  .preview span {
+    display: block;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    max-width: 190px;
+  }
+
+  .scrollcue {
+    position: absolute;
+    right: 2.6%;
+    bottom: 5.4%;
+    z-index: 6;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    animation: nudge 2.4s ease-in-out infinite;
+  }
+
+  @keyframes nudge {
+    50% {
+      transform: translateY(5px);
+    }
+  }
+
+  /* ------------------------------------------------ second écran */
+
+  .downloads {
+    padding: 92px 34px 26px;
+    border-top: 1px solid var(--line);
+  }
+
+  .kicker {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--pink);
+  }
+
+  .downloads h2 {
+    margin: 12px 0 8px;
+    font-size: clamp(1.7rem, 3.4vw, 2.7rem);
+    font-weight: 900;
+    letter-spacing: -0.035em;
+    text-transform: uppercase;
+  }
+
+  .downloads > p {
+    margin: 0 0 34px;
+    max-width: 58ch;
+    font-size: 13px;
+    line-height: 1.72;
+    color: var(--text-dim);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+    gap: 14px;
+    margin-bottom: 54px;
+  }
+
+  .dl {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 20px;
+    border-radius: 16px;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    transition: border-color 0.18s ease, transform 0.18s ease;
+  }
+
+  .dl:hover {
+    border-color: var(--line-strong);
+    transform: translateY(-2px);
+  }
+
+  .dl.is-primary {
+    border-color: color-mix(in srgb, var(--accent) 44%, transparent);
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--pink) 12%, transparent), transparent 58%),
+      var(--bg-panel);
+  }
+
+  .dl strong {
+    font-size: 14.5px;
+    font-weight: 700;
+  }
+
+  .dl span {
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--text-dim);
+  }
+
+  .dl em {
+    margin-top: 4px;
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+  }
+
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(216px, 1fr));
+    gap: 30px 26px;
+    padding-top: 40px;
+    border-top: 1px solid var(--line);
+  }
+
+  .features h3 {
+    margin: 0 0 7px;
+    font-size: 13.5px;
+    font-weight: 700;
+  }
+
+  .features p {
+    margin: 0;
+    font-size: 12.2px;
+    line-height: 1.68;
+    color: var(--text-dim);
+  }
+
+  .features .num {
+    display: block;
+    margin-bottom: 11px;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.1em;
+    color: var(--pink);
+  }
+
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    justify-content: space-between;
+    margin-top: 62px;
+    padding: 22px 0 8px;
+    border-top: 1px solid var(--line);
+    font-size: 11.5px;
+    color: var(--text-mute);
+  }
+
+  /* --------------------------------------------------------- compact */
+
+  /* Sous 1080 px la composition ne tient plus : on la déroule. */
+  @media (max-width: 1080px) {
+    .stage {
+      height: auto;
+      min-height: 0;
+      padding: 104px 22px 44px;
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+    }
+
+    .vertical,
+    .ticks,
+    .index,
+    .social,
+    .scrollcue,
+    .card,
+    .track {
+      display: none;
+    }
+
+    .nav {
+      display: none;
+    }
+
+    .ghost {
+      top: 58px;
+      font-size: clamp(4rem, 22vw, 9rem);
+    }
+
+    .shot,
+    .headline,
+    .lede,
+    .thumbs,
+    .preview {
+      position: static;
+      transform: none;
+      width: 100%;
+      left: auto;
+      right: auto;
+      top: auto;
+      bottom: auto;
+      animation: none;
+    }
+
+    .lede {
+      max-width: 62ch;
+    }
+
+    .thumbs {
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+
+    .thumb.lg {
+      width: 118px;
+      height: 74px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation: none !important;
+    }
+  }
+</style>
+
+<section class="stage">
+  <div class="ghost" aria-hidden="true">AUDII</div>
+
+  <header class="top">
+    <a class="tile" href="#telecharger" aria-label="Audii, accueil">__LOGO_32__</a>
+
+    <nav class="nav">
+      <a class="is-active" href="#top">Accueil</a>
+      <a href="#telecharger">Le lecteur</a>
+      <a href="#technologie">Technologie</a>
+      <a href="#tarifs">Tarifs</a>
+      <a href="#buyticle">Buyticle</a>
+    </nav>
+
+    <div class="top-right">
+      <a class="pill is-brand" href="#telecharger">Télécharger</a>
+      <a class="square" href="#telecharger" aria-label="Aller aux téléchargements">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <span class="vertical">AUDII</span>
+
+  <img class="shot" id="shot" src="data:image/jpeg;base64,__IMG_now-playing__" alt="Audii, page du morceau en lecture" />
+
+  <article class="card card-vibe">
+    <h3>__SPARK__ Lock-Vibe</h3>
+    <p>Enchaîne au bon tempo sans sortir de l’univers du morceau en cours.</p>
+  </article>
+
+  <article class="card card-stat">
+    <span class="stat-value">20 %</span>
+    <p>Noise Sense écoute la pièce et descend le volume à 20 % dès que quelqu’un vous parle.</p>
+    <div class="chips" aria-hidden="true">
+      <span class="chip">__MIC__</span>
+      <span class="chip">__WAVE__</span>
+      <span class="chip">__LOCK__</span>
+      <span class="chip">__SPARK__</span>
+    </div>
+  </article>
+
+  <h1 class="headline">Le bon tempo,<br /><span class="slashes">///</span>au bon moment.</h1>
+
+  <div class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+  <nav class="index" id="index" aria-label="Écrans d’Audii"></nav>
+
+  <div class="lede">
+    <div class="rule" aria-hidden="true"></div>
+    <p>
+      Audii lit les fichiers audio de votre disque, estime le tempo de chacun sur votre machine, et
+      enchaîne les titres selon leur rythme <em>et</em> leur style. Rien ne part en ligne.
+    </p>
+    <div class="actions">
+      <a class="pill" href="#telecharger">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>
+        Télécharger pour Windows
+      </a>
+      <a class="ghost-link" href="#technologie">Comment ça marche</a>
+    </div>
+  </div>
+
+  <div class="social">
+    <a href="https://github.com/end2-237/audii" aria-label="Le code sur GitHub">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.36 1.09 2.93.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.75c0 .26.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>
+    </a>
+    <a href="https://github.com/end2-237/audii/releases" aria-label="Toutes les versions">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    </a>
+    <a href="#buyticle" aria-label="Buyticle">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4V6Z"/><path d="M14 6v12"/></svg>
+    </a>
+  </div>
+
+  <div class="thumbs" id="thumbs"></div>
+  <div class="track" id="track" aria-hidden="true"></div>
+
+  <div class="preview">
+    <span class="play" aria-hidden="true">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>
+    </span>
+    <span>
+      <strong>Six écrans, un vrai build</strong>
+      <span>Captures prises par la CI sur l’exécutable Windows livré.</span>
+    </span>
+  </div>
+
+  <a class="scrollcue" href="#telecharger" aria-label="Descendre">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+  </a>
+</section>
+
+<section class="downloads" id="telecharger">
+  <span class="kicker">Version 0.1.0 · Windows</span>
+  <h2>Télécharger Audii</h2>
+  <p>
+    Si vous ne savez pas quel processeur équipe votre PC, prenez l’installateur universel : il
+    contient les deux architectures et choisit la bonne tout seul. Pour vérifier, tapez
+    <code>$env:PROCESSOR_ARCHITECTURE</code> dans PowerShell.
+  </p>
+
+  <div class="grid">
+    <a class="dl is-primary" href="https://github.com/end2-237/audii/releases">
+      <strong>Installateur universel</strong>
+      <span>Contient x64 et ARM64. Windows prend la bonne version à l’installation.</span>
+      <em>Audii-Setup-0.1.0.exe</em>
+    </a>
+    <a class="dl" href="https://github.com/end2-237/audii/releases">
+      <strong>Installateur x64</strong>
+      <span>Pour les PC Intel et AMD, soit l’immense majorité des machines.</span>
+      <em>Audii-Setup-0.1.0-x64.exe</em>
+    </a>
+    <a class="dl" href="https://github.com/end2-237/audii/releases">
+      <strong>Installateur ARM64</strong>
+      <span>Pour les PC à processeur ARM — Surface Pro X, Snapdragon X.</span>
+      <em>Audii-Setup-0.1.0-arm64.exe</em>
+    </a>
+    <a class="dl" href="https://github.com/end2-237/audii/releases">
+      <strong>Version portable</strong>
+      <span>Aucune installation : le fichier se lance tel quel, depuis une clé USB si besoin.</span>
+      <em>Audii-0.1.0-portable.exe</em>
+    </a>
+  </div>
+
+  <div class="features" id="technologie">
+    <div>
+      <span class="num">01</span>
+      <h3>Le tempo, calculé chez vous</h3>
+      <p>
+        Audii décode chaque morceau, suit l’enveloppe d’énergie et cherche la période qui revient.
+        Aucun service en ligne, aucun envoi de fichier.
+      </p>
+    </div>
+    <div>
+      <span class="num">02</span>
+      <h3>Le style avant le chiffre</h3>
+      <p>
+        Naviguer au BPM à l’aveugle fait passer du gospel au drill. Audii pondère le tempo par une
+        parenté de style et reste dans l’univers du titre en cours.
+      </p>
+    </div>
+    <div>
+      <span class="num">03</span>
+      <h3>Noise Sense</h3>
+      <p>
+        Le micro mesure le bruit ambiant. Quelqu’un vous parle, le volume descend à 20 % puis
+        remonte seul. Ça continue de fonctionner fenêtre réduite.
+      </p>
+    </div>
+    <div>
+      <span class="num">04</span>
+      <h3>Playlists par tempo</h3>
+      <p>
+        Les titres se rangent d’eux-mêmes en tranches de 10 BPM, triables du plus rapide au plus
+        lent ou l’inverse.
+      </p>
+    </div>
+    <div>
+      <span class="num">05</span>
+      <h3>Mini-lecteur flottant</h3>
+      <p>
+        Fenêtre réduite, un lecteur discret reste au-dessus des autres applications, et se replie en
+        pastille quand il gêne.
+      </p>
+    </div>
+    <div>
+      <span class="num">06</span>
+      <h3>Français et anglais</h3>
+      <p>
+        Toute l’interface bascule d’une langue à l’autre depuis les réglages, sans redémarrage et
+        sans mélange.
+      </p>
+    </div>
+  </div>
+
+  <footer id="buyticle">
+    <span>Audii — un produit <strong>Buyticle</strong>.</span>
+    <span id="tarifs">Abonnement prévu à 200–300 FCFA par mois, par Mobile Money.</span>
+  </footer>
+</section>
+
+<script>
+  // Carrousel : l'index numéroté, les vignettes et la barre pilotent la même
+  // image. Les numéros ne décorent pas, ils comptent de vrais écrans.
+  const VUES = __VUES__
+
+  const shot = document.getElementById('shot')
+  const index = document.getElementById('index')
+  const thumbs = document.getElementById('thumbs')
+  const track = document.getElementById('track')
+  let actif = 0
+
+  VUES.forEach((vue, i) => {
+    const numero = document.createElement('button')
+    numero.type = 'button'
+    numero.textContent = String(i + 1).padStart(2, '0')
+    numero.title = vue.label
+    numero.addEventListener('click', () => montrer(i))
+    index.append(numero)
+
+    const vignette = document.createElement('button')
+    vignette.type = 'button'
+    vignette.className = 'thumb'
+    vignette.title = vue.label
+    vignette.setAttribute('aria-label', vue.label)
+    const image = document.createElement('img')
+    image.src = vue.src
+    image.alt = ''
+    vignette.append(image)
+    vignette.addEventListener('click', () => montrer(i))
+    thumbs.append(vignette)
+
+    track.append(document.createElement('i'))
+  })
+
+  function montrer(i) {
+    actif = i
+    shot.src = VUES[i].src
+    shot.alt = 'Audii — ' + VUES[i].label
+    ;[...index.children].forEach((el, k) => el.setAttribute('aria-current', String(k === i)))
+    ;[...thumbs.children].forEach((el, k) => {
+      el.setAttribute('aria-current', String(k === i))
+      el.classList.toggle('lg', k === i)
+      el.classList.toggle('sm', k !== i)
+    })
+    ;[...track.children].forEach((el, k) => el.classList.toggle('is-on', k === i))
+  }
+
+  montrer(0)
+
+  // Défilement automatique, interrompu dès qu'on touche à quelque chose.
+  let minuterie = setInterval(() => montrer((actif + 1) % VUES.length), 6000)
+  const arreter = () => clearInterval(minuterie)
+  index.addEventListener('click', arreter)
+  thumbs.addEventListener('click', arreter)
+</script>

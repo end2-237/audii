@@ -12,10 +12,19 @@ files:
   - package.json
 
 asar: true
-compression: normal
+# LZMA au maximum. Le plancher d'une application Electron, c'est Chromium :
+# l'exécutable seul pèse ~195 Mo et rien ne le réduira sans quitter Electron.
+# En revanche le *téléchargement* se comprime bien, et c'est ce que
+# l'utilisateur subit.
+compression: maximum
 
 win:
   icon: build/icon.ico
+  # Windows n'a pas besoin des 50 langues d'Electron : Audii n'en parle que
+  # deux. Autant de fichiers .pak en moins dans l'installation.
+  electronLanguages:
+    - en-US
+    - fr
   # Deux architectures : un binaire x64 ne démarre pas sur un PC ARM64, et
   # Windows y répond par « cette application ne peut pas s'exécuter sur votre
   # PC ». L'architecture figure dans le nom du fichier pour ne pas se tromper.
