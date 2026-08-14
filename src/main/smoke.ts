@@ -180,6 +180,16 @@ export async function runSmoke(window: BrowserWindow): Promise<void> {
     await shoot(window, 'now-playing')
     if (followUps === 0) failures.push('« Continuer sur ce rythme » ne propose rien')
 
+    // Le mot d'Audii : écrit par le modèle distant s'il répond, pioché dans
+    // la réserve locale sinon. Dans les deux cas la phrase doit être là, la
+    // lecture ayant démarré une nouvelle file.
+    const whisper = await run<string | null>(
+      `document.querySelector('.whisper-text')?.textContent?.trim() ?? null`
+    )
+    log(`mot d'Audii : ${whisper ?? 'absent'}`)
+    if (!whisper) failures.push("aucune phrase d'ambiance au lancement de la playlist")
+    else if (whisper.includes('{')) failures.push(`phrase non interpolée : ${whisper}`)
+
     /* --------------------------------------------------- playlists tempo */
 
     await run(`document.querySelector('.tabs .tab[data-tab="tempo"]')?.click()`)

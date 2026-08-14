@@ -2060,6 +2060,96 @@ li {
   align-items: flex-end;
 }
 
+/* ------------------------------------------------------- Le mot d'Audii */
+
+.whisper {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 14px 14px 14px 15px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--pink) 16%, transparent), transparent 62%),
+    var(--surface-2, rgba(255, 255, 255, 0.045));
+  animation: whisper-in 0.5s cubic-bezier(0.22, 0.9, 0.3, 1);
+}
+
+@keyframes whisper-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.whisper-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(140deg, var(--pink), var(--accent));
+  /* Respiration lente : le composant doit se remarquer sans clignoter. */
+  animation: whisper-pulse 3.4s ease-in-out infinite;
+}
+
+@keyframes whisper-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+
+.whisper-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.whisper-kicker {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pink);
+}
+
+.whisper-text {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.whisper-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--text-dim);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.whisper-close:hover {
+  background: rgba(127, 127, 127, 0.16);
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .whisper,
+  .whisper-icon {
+    animation: none;
+  }
+}
+
 .now-art {
   flex: none;
   box-shadow: 0 22px 50px rgba(0, 0, 0, 0.45);

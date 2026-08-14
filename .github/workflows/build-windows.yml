@@ -61,6 +61,10 @@ jobs:
       - run: npm ci
 
       - name: Compilation (main + preload + renderer)
+        env:
+          # Scelle la clé du modèle dans le binaire. Secret absent = phrases
+          # locales uniquement, ce qui reste un fonctionnement complet.
+          AUDII_GROQ_KEY: ${{ secrets.AUDII_GROQ_KEY }}
         run: npm run build
 
       - name: Empaquetage electron-builder

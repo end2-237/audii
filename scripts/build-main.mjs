@@ -20,6 +20,14 @@ const common = {
   // Electron est fourni par le runtime ; tout le reste est bundlé pour que le
   // paquet final n'embarque aucun node_modules.
   external: ['electron'],
+  define: {
+    // Clé du modèle scellée dans le binaire au moment de la compilation.
+    // Elle ne doit pas vivre dans le dépôt : GitHub refuse le push, et à
+    // raison — une clé versionnée est publique. La CI la lit dans un secret
+    // de dépôt. Absente, la valeur est vide et l'application se rabat sur
+    // ses phrases locales, ce qui reste un fonctionnement complet.
+    'process.env.AUDII_BUNDLED_GROQ_KEY': JSON.stringify(process.env.AUDII_GROQ_KEY ?? '')
+  },
   logLevel: 'info'
 }
 

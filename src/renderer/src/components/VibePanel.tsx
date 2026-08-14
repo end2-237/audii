@@ -1,7 +1,7 @@
 import { LANGUAGES, LANGUAGE_LABELS } from '@shared/i18n'
 import { useAudii, useEngine } from '@/state/AudiiProvider'
 import { energyLabel, energyToFactor, trackBpm } from '@/audio/vibe'
-import { IconClose, IconFolder, IconLock, IconMic, IconSun, IconUser, IconWave } from './Icons'
+import { IconClose, IconFolder, IconLock, IconMic, IconSparkle, IconSun, IconUser, IconWave } from './Icons'
 
 /** « C:\\Users\\moi\\Music\\Rock » -> « …\\Music\\Rock » (l'info utile est à droite). */
 function shortenPath(value: string): string {
@@ -122,6 +122,20 @@ export function VibePanel(): React.JSX.Element | null {
             />
           </div>
           <p className="vibe-hint">{t('vibe.styleLockHint')}</p>
+        </div>
+
+        <div className="vibe-block">
+          <div className="vibe-row">
+            <span className="vibe-label">
+              <IconSparkle size={15} /> {t('vibe.whisper')}
+            </span>
+            <Toggle
+              checked={settings.aiWhisper}
+              onChange={(value) => update({ aiWhisper: value })}
+              label={t('vibe.whisper')}
+            />
+          </div>
+          <p className="vibe-hint">{t('vibe.whisperHint')}</p>
         </div>
 
         <div className="vibe-block">

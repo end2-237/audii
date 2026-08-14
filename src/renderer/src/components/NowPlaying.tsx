@@ -3,6 +3,7 @@ import { trackBpm } from '@/audio/vibe'
 import { formatTime } from '@/lib/format'
 import { artistName } from '@/lib/labels'
 import { Cover } from './Cover'
+import { AiWhisper } from './AiWhisper'
 import { ContinueRhythm } from './ContinueRhythm'
 import { IconHeart, IconFolder, IconPause, IconPlay } from './Icons'
 
@@ -96,6 +97,7 @@ export function NowPlaying(): React.JSX.Element {
           </div>
         </header>
 
+        <AiWhisper />
         <ContinueRhythm />
       </div>
     </section>

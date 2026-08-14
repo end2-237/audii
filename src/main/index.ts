@@ -6,8 +6,16 @@ import { registerHandler, registerScheme } from './protocol'
 import { destroyMini, hideMini, pushSnapshot, setCollapsed, showMini } from './mini'
 import { captureSplash, runSmoke, smokeDir } from './smoke'
 import { store } from './store'
+import { requestWhisper, resolveKey } from './ai'
 import { translate, type Lang, type MessageKey, type Params } from '../shared/i18n'
-import type { Library, MiniCommand, PlayerSnapshot, ScanProgress, Settings } from '../shared/types'
+import type {
+  Library,
+  MiniCommand,
+  PlayerSnapshot,
+  ScanProgress,
+  Settings,
+  WhisperRequest
+} from '../shared/types'
 
 const isDev = !app.isPackaged
 const devServer = process.env.AUDII_DEV_SERVER
@@ -273,6 +281,14 @@ function registerIpc(): void {
     // La langue sert aussi côté principal (splash, dialogues, scan).
     if (patch.language) lang = patch.language
     return store.setSettings(patch)
+  })
+
+  // Phrase d'ambiance : le renderer décide *quand* demander, le principal
+  // sait *comment*. Un échec renvoie null et le renderer pioche localement.
+  ipcMain.handle('ai:whisper', async (_event, context: WhisperRequest) => {
+    const settings = await store.getSettings()
+    if (!settings.aiWhisper) return null
+    return requestWhisper({ ...context, lang: settings.language }, resolveKey(settings.groqKey))
   })
 
   ipcMain.handle('library:get', () => store.getLibrary())

@@ -110,8 +110,24 @@ export interface Settings {
   tempoSort: SortDirection
   /** Rester dans le même univers musical lors des enchaînements. */
   styleLock: boolean
+  /** Phrases d'ambiance écrites par l'IA en début de playlist. */
+  aiWhisper: boolean
+  /** Horodatage de la dernière phrase affichée, pour espacer les suivantes. */
+  aiWhisperAt: number
+  /** Clé Groq personnelle ; vide = celle livrée avec l'application. */
+  groqKey: string
   /** Position mémorisée du mini-lecteur flottant. */
   miniPosition: { x: number; y: number } | null
+}
+
+/** Contexte envoyé au modèle pour écrire une phrase d'ambiance. */
+export interface WhisperRequest {
+  title: string
+  artist: string
+  album: string
+  genre: string
+  bpm: number | null
+  playlist: string
 }
 
 /** État de lecture publié vers le mini-lecteur. */
@@ -150,6 +166,9 @@ export const DEFAULT_SETTINGS: Settings = {
   resume: null,
   tempoSort: 'desc',
   styleLock: true,
+  aiWhisper: true,
+  aiWhisperAt: 0,
+  groqKey: '',
   miniPosition: null
 }
 

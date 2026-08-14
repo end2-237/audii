@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { Library, MiniCommand, PlayerSnapshot, ScanProgress, Settings } from '../shared/types'
+import type {
+  Library,
+  MiniCommand,
+  PlayerSnapshot,
+  ScanProgress,
+  Settings,
+  WhisperRequest
+} from '../shared/types'
 
 export interface SplashStatus {
   message: string
@@ -42,6 +49,15 @@ const api = {
   analysis: {
     save: (payload: { id: string; bpm: number | null; energy: number | null; mtime: number }): Promise<void> =>
       ipcRenderer.invoke('analysis:save', payload)
+  },
+
+  /**
+   * Phrase d'ambiance. Le renderer n'a jamais la clé du modèle : il envoie le
+   * contexte du morceau et reçoit une phrase, ou `null` s'il doit se
+   * débrouiller avec la réserve locale.
+   */
+  ai: {
+    whisper: (context: WhisperRequest): Promise<string | null> => ipcRenderer.invoke('ai:whisper', context)
   },
 
   window: {

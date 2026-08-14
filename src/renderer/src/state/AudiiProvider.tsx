@@ -17,10 +17,27 @@ import { buildTempoPlaylists, countUnanalyzed, type TempoPlaylist } from '@/audi
 import { trackBpm } from '@/audio/vibe'
 import type { Playlist } from '@shared/types'
 import { translate, type MessageKey, type Params } from '@shared/i18n'
+import { fillWhisper, pickWhisper } from '@shared/whispers'
 
 export type View = 'home' | 'playlists' | 'albums' | 'artists' | 'tempo' | 'now'
 
 const EMPTY_LIBRARY: Library = { tracks: [], playlists: [], folders: [], scannedAt: 0 }
+
+/**
+ * Délai de garde entre deux phrases d'ambiance.
+ *
+ * La contrainte est double : la phrase n'apparaît qu'au *lancement d'une
+ * playlist* (jamais sur les enchaînements), et jamais deux fois dans la même
+ * demi-heure. Pas de tirage au sort en plus : une phrase qui apparaît une
+ * fois sur deux passe pour un bug, alors qu'une règle stable se comprend.
+ */
+const WHISPER_COOLDOWN_MS = 25 * 60 * 1000
+
+/** Phrase d'ambiance en cours, rattachée au morceau qui l'a déclenchée. */
+interface Whisper {
+  trackId: string
+  text: string
+}
 
 interface AudiiContextValue {
   library: Library
@@ -43,6 +60,8 @@ interface AudiiContextValue {
   pendingAnalysis: number
   /** Playlist des titres aimés (null si aucun). */
   favorites: Playlist | null
+  /** Phrase d'ambiance du morceau en cours, `null` la plupart du temps. */
+  whisper: string | null
   platform: string
   /** Traduction : `t('nav.home')`, `t('tempo.tracks', { count })`. */
   t: (key: MessageKey, params?: Params) => string
@@ -103,9 +122,12 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
   const [tapBpm, setTapBpm] = useState<number | null>(null)
   const [vibeOpen, setVibeOpen] = useState(false)
   const [platform, setPlatform] = useState('win32')
+  const [whisper, setWhisper] = useState<Whisper | null>(null)
 
   const taps = useRef<number[]>([])
   const history = useRef<string[]>([])
+  /** Dernier message de repli, pour ne pas le ressortir deux fois de suite. */
+  const lastWhisper = useRef<string | null>(null)
   const libraryRef = useRef(library)
   const settingsRef = useRef(settings)
   const queueRef = useRef<string[]>([])
@@ -294,14 +316,61 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
     void window.audii.settings.set(patch)
   }, [])
 
-  const play = useCallback((track: Track, queue: Track[]) => {
-    setCurrentId(track.id)
-    setLastPlayed(track)
-    setQueueIds(queue.map((item) => item.id))
-    history.current = [...history.current, track.id].slice(-40)
-    analysis.current?.prioritize(track)
-    void engine.load(track.url, true)
-  }, [])
+  /**
+   * Demande une phrase d'ambiance pour le morceau qui ouvre une playlist.
+   *
+   * On horodate *avant* la requête : deux playlists lancées coup sur coup ne
+   * doivent pas produire deux phrases pendant que la première est en vol.
+   */
+  const maybeWhisper = useCallback(
+    (track: Track) => {
+      const settingsNow = settingsRef.current
+      if (!settingsNow.aiWhisper) return
+      if (Date.now() - settingsNow.aiWhisperAt < WHISPER_COOLDOWN_MS) return
+      persist({ aiWhisperAt: Date.now() })
+
+      const playlist = libraryRef.current.playlists.find((item) => item.id === selectedRef.current)
+      void (async () => {
+        const remote = await window.audii.ai.whisper({
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          genre: track.genre,
+          bpm: trackBpm(track),
+          playlist: playlist?.name ?? ''
+        })
+        // Le modèle est un bonus : sans lui, la réserve locale fait le travail.
+        const template = remote ?? pickWhisper(settingsNow.language, lastWhisper.current)
+        if (!remote) lastWhisper.current = template
+        const artist = track.artist || translate(settingsNow.language, 'track.unknownArtist')
+        setWhisper({ trackId: track.id, text: fillWhisper(template, track.title, artist) })
+      })()
+    },
+    [persist]
+  )
+
+  const play = useCallback(
+    (track: Track, queue: Track[]) => {
+      const ids = queue.map((item) => item.id)
+      // « Début de playlist » = la file change, pas un simple enchaînement.
+      const previous = queueRef.current
+      const isNewQueue =
+        ids.length !== previous.length || ids[0] !== previous[0] || ids[ids.length - 1] !== previous.at(-1)
+
+      setCurrentId(track.id)
+      setLastPlayed(track)
+      setQueueIds(ids)
+      history.current = [...history.current, track.id].slice(-40)
+      analysis.current?.prioritize(track)
+      void engine.load(track.url, true)
+
+      // La phrase appartient au morceau qui ouvre la file : on la retire dès
+      // qu'on passe à autre chose.
+      setWhisper(null)
+      if (isNewQueue) maybeWhisper(track)
+    },
+    [maybeWhisper]
+  )
 
   /**
    * Sauvegarde périodique de l'écoute en cours. On écrit directement sur
@@ -544,6 +613,7 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
       followUps,
       pendingAnalysis,
       favorites,
+      whisper: whisper && current && whisper.trackId === current.id ? whisper.text : null,
       platform,
       t,
       setView,
@@ -582,6 +652,7 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
       followUps,
       pendingAnalysis,
       favorites,
+      whisper,
       platform,
       t,
       selectPlaylist,

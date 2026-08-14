@@ -56,6 +56,12 @@ const fr = {
   'vibe.styleLock': 'Rester dans le style',
   'vibe.styleLockHint':
     "Sans ce garde-fou, l'enchaînement suit le BPM à l'aveugle et peut passer du gospel au drill. Activé, Audii reste dans l'univers du morceau en cours.",
+  'vibe.whisper': "Le mot d'Audii",
+  'vibe.whisperHint':
+    "Une phrase écrite pour le morceau qui ouvre une playlist. Jamais deux fois dans la même demi-heure, jamais sur un simple enchaînement.",
+
+  'whisper.kicker': "Le mot d'Audii",
+  'whisper.dismiss': 'Masquer ce message',
 
   'table.title': 'Titre',
   'table.album': 'Album',
@@ -297,6 +303,12 @@ const en: Record<MessageKey, string> = {
   'vibe.styleLock': 'Stay in style',
   'vibe.styleLockHint':
     'Without this guard the engine follows BPM blindly and can jump from gospel to drill. Turned on, Audii stays in the current track’s world.',
+  'vibe.whisper': 'A word from Audii',
+  'vibe.whisperHint':
+    'One line written for the track that opens a playlist. Never twice in the same half hour, never on a plain track change.',
+
+  'whisper.kicker': 'A word from Audii',
+  'whisper.dismiss': 'Hide this message',
 
   'table.title': 'Title',
   'table.album': 'Album',
