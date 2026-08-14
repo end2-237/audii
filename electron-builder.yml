@@ -31,6 +31,15 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Audii
+  # Raccourci à la racine du menu Démarrer, sans sous-dossier : c'est le
+  # chemin que l'installateur ouvre en fin de parcours, et un sous-dossier
+  # le rendait ambigu.
+  menuCategory: false
+  # La case « lancer Audii » de la dernière page ouvrait le raccourci du menu
+  # Démarrer plutôt que l'exécutable, ce que Windows refusait
+  # (« ce fichier ne contient pas d'application associée »). L'installation
+  # elle-même n'était pas en cause ; on retire simplement ce lancement.
+  runAfterFinish: false
   deleteAppDataOnUninstall: false
   artifactName: ${productName}-Setup-${version}.${ext}
 
