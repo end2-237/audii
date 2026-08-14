@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Track } from '@shared/types'
 import { useAudii, useEngine } from '@/state/AudiiProvider'
 import { formatDate, formatTime } from '@/lib/format'
+import { artistName } from '@/lib/labels'
 import { trackBpm } from '@/audio/vibe'
 import { Cover } from './Cover'
 import { IconDots, IconHeart, IconPause, IconPlay } from './Icons'
@@ -11,7 +12,7 @@ interface TrackTableProps {
 }
 
 export function TrackTable({ tracks }: TrackTableProps): React.JSX.Element {
-  const { current, play, settings, toggleFavorite, reveal, toggle } = useAudii()
+  const { current, play, settings, toggleFavorite, reveal, toggle, t } = useAudii()
   const { playing } = useEngine()
   const [menuFor, setMenuFor] = useState<string | null>(null)
 
@@ -19,10 +20,10 @@ export function TrackTable({ tracks }: TrackTableProps): React.JSX.Element {
     <div className="tracks">
       <div className="tracks-head">
         <span className="col-index">#</span>
-        <span className="col-title">Title</span>
-        <span className="col-album">Album</span>
-        <span className="col-date">Added date</span>
-        <span className="col-time">Time</span>
+        <span className="col-title">{t('table.title')}</span>
+        <span className="col-album">{t('table.album')}</span>
+        <span className="col-date">{t('table.added')}</span>
+        <span className="col-time">{t('table.time')}</span>
         <span className="col-actions" />
       </div>
 
@@ -42,7 +43,7 @@ export function TrackTable({ tracks }: TrackTableProps): React.JSX.Element {
                 <button
                   type="button"
                   className="row-play"
-                  title={isPlaying ? 'Pause' : 'Lire'}
+                  title={t(isPlaying ? 'row.pause' : 'row.play')}
                   onClick={() => (isCurrent ? toggle() : play(track, tracks))}
                 >
                   {isPlaying ? <IconPause size={14} /> : <IconPlay size={14} />}
@@ -54,7 +55,7 @@ export function TrackTable({ tracks }: TrackTableProps): React.JSX.Element {
                 <span className="track-text">
                   <span className="track-name">{track.title}</span>
                   <span className="track-sub">
-                    <span className="track-artist">{track.artist}</span>
+                    <span className="track-artist">{artistName(track, t)}</span>
                     {/* Le tempo n'apparaît que lorsque le moteur rythmique est armé. */}
                     {settings.lockVibe && bpm && <em className="bpm-chip">{bpm} BPM</em>}
                   </span>
@@ -71,7 +72,7 @@ export function TrackTable({ tracks }: TrackTableProps): React.JSX.Element {
                 <button
                   type="button"
                   className={`icon-ghost xs${settings.favorites.includes(track.id) ? ' is-liked' : ''}`}
-                  title="Favori"
+                  title={t('row.favorite')}
                   onClick={() => toggleFavorite(track.id)}
                 >
                   <IconHeart size={15} filled={settings.favorites.includes(track.id)} />
@@ -79,7 +80,7 @@ export function TrackTable({ tracks }: TrackTableProps): React.JSX.Element {
                 <button
                   type="button"
                   className="icon-ghost xs"
-                  title="Plus d'options"
+                  title={t('row.more')}
                   onClick={() => setMenuFor(menuFor === track.id ? null : track.id)}
                 >
                   <IconDots size={16} />
@@ -87,10 +88,10 @@ export function TrackTable({ tracks }: TrackTableProps): React.JSX.Element {
                 {menuFor === track.id && (
                   <span className="row-menu" onMouseLeave={() => setMenuFor(null)}>
                     <button type="button" onClick={() => { play(track, tracks); setMenuFor(null) }}>
-                      Lire maintenant
+                      {t('row.playNow')}
                     </button>
                     <button type="button" onClick={() => { reveal(track); setMenuFor(null) }}>
-                      Afficher dans l'explorateur
+                      {t('row.reveal')}
                     </button>
                     <span className="row-menu-path">{track.path}</span>
                   </span>

@@ -7,6 +7,8 @@
  * « Smart Dim » du moteur Noise Sense, ce qui permet des fondus propres.
  */
 
+import type { MessageKey } from '@shared/i18n'
+
 export interface EngineState {
   playing: boolean
   currentTime: number
@@ -16,10 +18,17 @@ export interface EngineState {
   dim: number
   /** Niveau sonore ambiant mesuré (0..1). */
   ambient: number
-  error: string | null
+  /** Clé de traduction de la dernière erreur, `null` si tout va bien. */
+  error: MessageKey | null
 }
 
 type Listener = (state: EngineState) => void
+
+/**
+ * Cadence d'écoute de l'environnement (~20 Hz). Assez fin pour réagir à une
+ * voix, assez lâche pour rester négligeable côté processeur.
+ */
+const NOISE_INTERVAL_MS = 50
 
 export class AudioEngine {
   readonly element: HTMLAudioElement
@@ -30,7 +39,7 @@ export class AudioEngine {
   private micStream: MediaStream | null = null
   private micAnalyser: AnalyserNode | null = null
   private micBuffer: Float32Array<ArrayBuffer> | null = null
-  private noiseRaf = 0
+  private noiseTimer: ReturnType<typeof setInterval> | null = null
   private baseline = 0.02
   private dimUntil = 0
 
@@ -75,7 +84,7 @@ export class AudioEngine {
       sync({
         playing: false,
         buffering: false,
-        error: code === 4 ? 'Format non supporté par le lecteur' : 'Lecture impossible'
+        error: code === 4 ? 'error.format' : 'error.playback'
       })
     })
   }
@@ -118,9 +127,20 @@ export class AudioEngine {
     }
   }
 
-  async load(url: string, autoplay: boolean): Promise<void> {
+  /** Charge un morceau, éventuellement en reprenant à `startAt` secondes. */
+  async load(url: string, autoplay: boolean, startAt = 0): Promise<void> {
     this.element.src = url
-    this.patch({ currentTime: 0, duration: 0, error: null, buffering: true })
+    this.patch({ currentTime: startAt, duration: 0, error: null, buffering: true })
+    if (startAt > 0) {
+      const seekOnce = (): void => {
+        this.element.removeEventListener('loadedmetadata', seekOnce)
+        // `duration` n'est connue qu'ici : on borne la reprise à la fin du titre.
+        const limit = Number.isFinite(this.element.duration) ? this.element.duration - 1 : startAt
+        this.element.currentTime = Math.max(0, Math.min(startAt, limit))
+        this.patch({ currentTime: this.element.currentTime })
+      }
+      this.element.addEventListener('loadedmetadata', seekOnce)
+    }
     if (autoplay) await this.play()
   }
 
@@ -193,17 +213,20 @@ export class AudioEngine {
       this.micAnalyser = analyser
       this.micBuffer = new Float32Array(analyser.fftSize)
       this.baseline = 0.02
-      this.loopNoise()
+      // Un intervalle, pas requestAnimationFrame : le navigateur ne produit
+      // plus de frames quand la fenêtre est réduite ou masquée, ce qui
+      // gèlerait l'écoute de l'environnement.
+      this.noiseTimer = setInterval(this.loopNoise, NOISE_INTERVAL_MS)
       return true
     } catch {
-      this.patch({ error: 'Micro indisponible : Noise Sense désactivé' })
+      this.patch({ error: 'error.mic' })
       return false
     }
   }
 
   disableNoiseSense(): void {
-    cancelAnimationFrame(this.noiseRaf)
-    this.noiseRaf = 0
+    if (this.noiseTimer) clearInterval(this.noiseTimer)
+    this.noiseTimer = null
     this.micStream?.getTracks().forEach((track) => track.stop())
     this.micStream = null
     this.micAnalyser = null
@@ -229,18 +252,15 @@ export class AudioEngine {
     const now = performance.now()
     if (rms > trigger) this.dimUntil = now + 1800 // maintien après le bruit
 
-    const shouldDim = now < this.dimUntil
-    const targetDim = shouldDim ? 0.2 : 1
+    const targetDim = now < this.dimUntil ? 0.2 : 1
     // Attaque rapide, retour progressif (fade-in) comme spécifié.
-    const speed = targetDim < this.state.dim ? 0.35 : 0.02
+    const speed = targetDim < this.state.dim ? 0.5 : 0.03
     const dim = this.state.dim + (targetDim - this.state.dim) * speed
 
     if (Math.abs(dim - this.state.dim) > 0.001 || Math.abs(ambient - this.state.ambient) > 0.01) {
       this.patch({ dim, ambient })
       this.applyGain()
     }
-
-    this.noiseRaf = requestAnimationFrame(this.loopNoise)
   }
 
   destroy(): void {

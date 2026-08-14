@@ -3,9 +3,11 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { scanLibrary } from './library'
 import { registerHandler, registerScheme } from './protocol'
+import { destroyMini, hideMini, pushSnapshot, setCollapsed, showMini } from './mini'
 import { captureSplash, runSmoke, smokeDir } from './smoke'
 import { store } from './store'
-import type { Library, ScanProgress, Settings } from '../shared/types'
+import { translate, type Lang, type MessageKey, type Params } from '../shared/i18n'
+import type { Library, MiniCommand, PlayerSnapshot, ScanProgress, Settings } from '../shared/types'
 
 const isDev = !app.isPackaged
 const devServer = process.env.AUDII_DEV_SERVER
@@ -19,6 +21,9 @@ let splashWindow: BrowserWindow | null = null
 let splashShownAt = 0
 let rendererReady = false
 let bootDone = false
+/** Langue courante, relue depuis les réglages : sert aux messages du splash. */
+let lang: Lang = 'fr'
+const t = (key: MessageKey, params?: Params): string => translate(lang, key, params)
 
 registerScheme()
 
@@ -84,13 +89,24 @@ function createMainWindow(): void {
       nodeIntegration: false,
       // Le preload n'utilise que contextBridge/ipcRenderer : compatible bac à sable.
       sandbox: true,
-      webSecurity: true
+      webSecurity: true,
+      // Noise Sense et la lecture doivent continuer fenêtre réduite : sans
+      // cela Chromium étrangle les minuteries des fenêtres non visibles.
+      backgroundThrottling: false
     }
   })
 
   mainWindow.on('maximize', () => mainWindow?.webContents.send('window:state', true))
   mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window:state', false))
+
+  // Le mini-lecteur prend le relais dès que la fenêtre disparaît de l'écran.
+  mainWindow.on('minimize', () => void showMini())
+  mainWindow.on('hide', () => void showMini())
+  mainWindow.on('restore', hideMini)
+  mainWindow.on('show', hideMini)
+
   mainWindow.on('closed', () => {
+    destroyMini()
     mainWindow = null
   })
 
@@ -119,7 +135,7 @@ function revealMainWindow(): void {
   setTimeout(async () => {
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (smokeDir && splashWindow) await captureSplash(splashWindow)
-    splashStatus('Prêt', 1, true)
+    splashStatus(t('splash.ready'), 1, true)
     // Laisse jouer l'animation de sortie du splash.
     setTimeout(() => {
       if (splashWindow && !splashWindow.isDestroyed()) {
@@ -136,7 +152,7 @@ function revealMainWindow(): void {
 }
 
 /** Dernier statut émis : rejoué si le splash finit de charger après coup. */
-let lastStatus = { message: 'Initialisation…', progress: 0.04, done: false }
+let lastStatus = { message: '', progress: 0.04, done: false }
 
 function splashStatus(message: string, progress: number, done = false): void {
   lastStatus = { message, progress, done }
@@ -163,15 +179,16 @@ async function ensureDefaultFolder(settings: Settings): Promise<Settings> {
 
 async function boot(): Promise<void> {
   try {
-    splashStatus('Chargement des préférences…', 0.1)
+    lang = (await store.getSettings()).language
+    splashStatus(t('splash.prefs'), 0.1)
     const settings = await ensureDefaultFolder(await store.getSettings())
 
-    splashStatus('Ouverture de la bibliothèque…', 0.25)
+    splashStatus(t('splash.library'), 0.25)
     const cached = await store.getLibrary()
 
     if (cached.tracks.length > 0) {
       // Démarrage instantané sur le cache, re-scan en tâche de fond.
-      splashStatus(`${cached.tracks.length} morceaux en cache`, 0.9)
+      splashStatus(t('splash.cached', { count: cached.tracks.length }), 0.9)
       bootDone = true
       revealMainWindow()
       void rescan(settings.folders)
@@ -179,25 +196,29 @@ async function boot(): Promise<void> {
     }
 
     if (settings.folders.length === 0) {
-      splashStatus('Aucun dossier musical configuré', 0.9)
+      splashStatus(t('splash.noFolder'), 0.9)
       bootDone = true
       revealMainWindow()
       return
     }
 
-    splashStatus('Analyse de vos fichiers audio…', 0.4)
-    await scanLibrary(settings.folders, (progress) => {
-      broadcast('library:progress', progress)
-      const ratio = progress.total > 0 ? progress.current / progress.total : 0
-      splashStatus(
-        progress.phase === 'discovering'
-          ? `Exploration… ${progress.current} fichier(s)`
-          : `Lecture des métadonnées ${progress.current}/${progress.total}`,
-        0.4 + ratio * 0.55
-      )
-    })
+    splashStatus(t('splash.analyzing'), 0.4)
+    await scanLibrary(
+      settings.folders,
+      (progress) => {
+        broadcast('library:progress', progress)
+        const ratio = progress.total > 0 ? progress.current / progress.total : 0
+        splashStatus(
+          progress.phase === 'discovering'
+            ? t('splash.exploring', { count: progress.current })
+            : t('splash.reading', { current: progress.current, total: progress.total }),
+          0.4 + ratio * 0.55
+        )
+      },
+      lang
+    )
   } catch (error) {
-    splashStatus('Démarrage en mode dégradé', 0.9)
+    splashStatus(t('splash.degraded'), 0.9)
     console.error('[audii] boot failed', error)
   } finally {
     bootDone = true
@@ -212,7 +233,7 @@ async function rescan(folders: string[]): Promise<Library> {
   if (rescanning) return store.getLibrary()
   rescanning = true
   try {
-    const library = await scanLibrary(folders, (progress) => broadcast('library:progress', progress))
+    const library = await scanLibrary(folders, (progress) => broadcast('library:progress', progress), lang)
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('library:updated', library)
     return library
   } catch (error) {
@@ -222,7 +243,7 @@ async function rescan(folders: string[]): Promise<Library> {
       current: 0,
       total: 0,
       file: '',
-      message: error instanceof Error ? error.message : 'Scan impossible'
+      message: error instanceof Error ? error.message : t('error.scan')
     } satisfies ScanProgress)
     return store.getLibrary()
   } finally {
@@ -244,7 +265,11 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('settings:get', () => store.getSettings())
-  ipcMain.handle('settings:set', (_event, patch: Partial<Settings>) => store.setSettings(patch))
+  ipcMain.handle('settings:set', async (_event, patch: Partial<Settings>) => {
+    // La langue sert aussi côté principal (splash, dialogues, scan).
+    if (patch.language) lang = patch.language
+    return store.setSettings(patch)
+  })
 
   ipcMain.handle('library:get', () => store.getLibrary())
 
@@ -256,7 +281,7 @@ function registerIpc(): void {
   ipcMain.handle('library:addFolder', async () => {
     if (!mainWindow) return null
     const result = await dialog.showOpenDialog(mainWindow, {
-      title: 'Ajouter un dossier musical',
+      title: t('dialog.addFolder'),
       properties: ['openDirectory', 'multiSelections', 'dontAddToRecent']
     })
     if (result.canceled || result.filePaths.length === 0) return null
@@ -287,6 +312,22 @@ function registerIpc(): void {
       track.energy = payload.energy
       store.saveLibrarySoon(library)
     }
+  })
+
+  ipcMain.on('player:publish', (_event, snapshot: PlayerSnapshot) => pushSnapshot(snapshot))
+
+  ipcMain.on('mini:command', (_event, command: MiniCommand) => {
+    mainWindow?.webContents.send('mini:command', command)
+  })
+
+  ipcMain.on('mini:collapsed', (_event, collapsed: boolean) => setCollapsed(collapsed))
+
+  ipcMain.on('mini:restore', () => {
+    if (!mainWindow) return
+    hideMini()
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
   })
 
   ipcMain.on('window:minimize', () => mainWindow?.minimize())

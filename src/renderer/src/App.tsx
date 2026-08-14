@@ -7,7 +7,10 @@ import { RightPanel } from '@/components/RightPanel'
 import { PlayerBar } from '@/components/PlayerBar'
 import { PlaylistView } from '@/components/PlaylistView'
 import { GridView } from '@/components/GridView'
+import { TempoView } from '@/components/TempoView'
+import { NowPlaying } from '@/components/NowPlaying'
 import { EmptyLibrary } from '@/components/EmptyLibrary'
+import { LoginScreen } from '@/components/LoginScreen'
 import { VibePanel } from '@/components/VibePanel'
 import { ScanToast } from '@/components/ScanToast'
 
@@ -20,7 +23,7 @@ function matches(track: Track, needle: string): boolean {
 }
 
 export default function App(): React.JSX.Element {
-  const { library, selectedPlaylistId, view, search, loading } = useAudii()
+  const { library, selectedPlaylistId, view, search, loading, settings, tempoPlaylists, favorites } = useAudii()
 
   const trackById = useMemo(() => {
     const map = new Map<string, Track>()
@@ -28,10 +31,12 @@ export default function App(): React.JSX.Element {
     return map
   }, [library.tracks])
 
-  const playlist = useMemo(
-    () => library.playlists.find((item) => item.id === selectedPlaylistId) ?? library.playlists[0] ?? null,
-    [library.playlists, selectedPlaylistId]
-  )
+  // Les playlists tempo vivent côté interface : la sélection doit pouvoir
+  // tomber sur l'une ou l'autre des deux sources.
+  const playlist = useMemo(() => {
+    const all = [...(favorites ? [favorites] : []), ...library.playlists, ...tempoPlaylists]
+    return all.find((item) => item.id === selectedPlaylistId) ?? library.playlists[0] ?? all[0] ?? null
+  }, [library.playlists, tempoPlaylists, favorites, selectedPlaylistId])
 
   const needle = search.trim().toLowerCase()
 
@@ -46,7 +51,11 @@ export default function App(): React.JSX.Element {
     [library.tracks, needle]
   )
 
+  // Le profil local conditionne l'entrée dans l'application.
+  if (!loading && !settings.profile) return <LoginScreen />
+
   const main = (): React.JSX.Element => {
+    if (view === 'now') return <NowPlaying />
     if (library.tracks.length === 0) return <EmptyLibrary />
     switch (view) {
       case 'albums':
@@ -55,6 +64,8 @@ export default function App(): React.JSX.Element {
         return <GridView mode="artist" tracks={allTracks} />
       case 'home':
         return <GridView mode="recent" tracks={allTracks} />
+      case 'tempo':
+        return <TempoView />
       default:
         return playlist ? <PlaylistView playlist={playlist} tracks={playlistTracks} /> : <EmptyLibrary />
     }

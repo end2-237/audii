@@ -1,4 +1,5 @@
 import type { Track } from '@shared/types'
+import { SAME_UNIVERSE, styleAffinity, styleOf, type StyleFamily } from './style'
 
 /** BPM connu d'un morceau : tag ID3 d'abord, analyse locale ensuite. */
 export const trackBpm = (track: Track): number | null => track.bpmTag ?? track.bpmAnalyzed ?? null
@@ -24,6 +25,8 @@ export interface VibeOptions {
   shuffle: boolean
   /** Morceaux récemment joués, à éviter. */
   history: string[]
+  /** Rester dans l'univers musical du morceau en cours. */
+  styleLock: boolean
 }
 
 /**
@@ -57,35 +60,69 @@ export function pickNextTrack(
     return queue[(index + 1) % queue.length]
   }
 
-  const target = reference * energyToFactor(options.energy)
+  const ranked = rankFollowUps(queue, current, options)
+  // Un peu d'aléatoire parmi les tout meilleurs, pour ne pas boucler.
+  const head = ranked.slice(0, 3)
+  const pick = head[Math.floor(Math.random() * head.length)]
+  return pick?.track ?? queue[(index + 1) % queue.length]
+}
+
+export interface FollowUp {
+  track: Track
+  score: number
+  bpm: number | null
+  /** Écart au tempo cible, en BPM (null si tempo inconnu). */
+  delta: number | null
+  /** Proximité de style avec le morceau en cours (0 à 1). */
+  affinity: number
+  style: StyleFamily | null
+}
+
+/**
+ * Classe les morceaux susceptibles de suivre celui en cours.
+ *
+ * Le score combine **tempo** et **style** : naviguer au BPM seul ferait
+ * passer d'un gospel à un morceau de drill parce qu'ils tournent tous deux à
+ * 140. Le style pèse donc un peu plus que le tempo, et `styleLock` restreint
+ * carrément les candidats au même univers dès qu'il y en a assez.
+ */
+export function rankFollowUps(
+  pool: Track[],
+  current: Track | null,
+  options: Pick<VibeOptions, 'energy' | 'tapBpm' | 'history' | 'styleLock'>
+): FollowUp[] {
+  const reference = options.tapBpm ?? (current ? trackBpm(current) : null)
+  const target = reference ? reference * energyToFactor(options.energy) : null
   const recent = new Set(options.history.slice(-8))
 
-  let best: Track | null = null
-  let bestScore = Number.NEGATIVE_INFINITY
-
-  for (const track of queue) {
+  const scored: FollowUp[] = []
+  for (const track of pool) {
     if (track.id === current?.id) continue
     const bpm = trackBpm(track)
-    // Sans tempo connu on reste candidat, mais avec un score prudent.
-    let score = bpm === null ? -0.35 : 1 - Math.min(1, Math.abs(bpm - target) / 40)
+    const delta = bpm !== null && target !== null ? bpm - target : null
 
-    if (current) {
-      if (track.artist === current.artist) score += 0.12
-      if (track.genre && track.genre === current.genre) score += 0.1
-      if (track.album === current.album) score += 0.06
-    }
-    if (track.energy !== null) score += (1 - Math.abs(track.energy - options.energy)) * 0.15
+    // Tempo : 1 sur la cible, 0 à 40 BPM d'écart. Sans tempo connu, on reste
+    // candidat mais en retrait.
+    const tempoScore = delta === null ? 0.25 : 1 - Math.min(1, Math.abs(delta) / 40)
+    const affinity = current ? styleAffinity(current, track) : 0.5
+
+    let score = tempoScore * 0.45 + affinity * 0.55
+    if (track.energy !== null) score += (1 - Math.abs(track.energy - options.energy)) * 0.08
     if (recent.has(track.id)) score -= 0.8
-    // Bruit léger : évite de toujours enchaîner le même morceau.
-    score += Math.random() * 0.05
 
-    if (score > bestScore) {
-      bestScore = score
-      best = track
-    }
+    scored.push({ track, score, bpm, delta, affinity, style: styleOf(track) })
   }
 
-  return best ?? queue[(index + 1) % queue.length]
+  scored.sort((a, b) => b.score - a.score)
+
+  if (options.styleLock && current) {
+    // On ne bascule vers un autre univers que s'il n'y a pas de quoi tenir
+    // dans celui du morceau en cours.
+    const sameUniverse = scored.filter((item) => item.affinity >= SAME_UNIVERSE)
+    if (sameUniverse.length >= 3) return sameUniverse
+  }
+
+  return scored
 }
 
 /** Moyenne des intervalles entre les taps, convertie en BPM. */

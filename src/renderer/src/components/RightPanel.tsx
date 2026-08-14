@@ -13,7 +13,7 @@ interface ArtistSummary {
 }
 
 export function RightPanel(): React.JSX.Element {
-  const { library, play } = useAudii()
+  const { library, play, t } = useAudii()
 
   const artists = useMemo<ArtistSummary[]>(() => {
     const map = new Map<string, { tracks: Track[]; albums: Set<string> }>()
@@ -29,7 +29,7 @@ export function RightPanel(): React.JSX.Element {
     }
     return [...map.entries()]
       .map(([name, entry]) => ({
-        name,
+        name: name || t('track.unknownArtist'),
         tracks: entry.tracks.length,
         albums: entry.albums.size,
         cover: entry.tracks.find((track) => track.cover)?.cover ?? null,
@@ -37,13 +37,13 @@ export function RightPanel(): React.JSX.Element {
       }))
       .sort((a, b) => b.tracks - a.tracks || a.name.localeCompare(b.name))
       .slice(0, 14)
-  }, [library.tracks])
+  }, [library.tracks, t])
 
   return (
     <aside className="right-panel">
       <div className="panel-head">
-        <h2>Top Artists</h2>
-        <button type="button" className="icon-ghost sm" title="Options">
+        <h2>{t('panel.topArtists')}</h2>
+        <button type="button" className="icon-ghost sm" title={t('panel.options')}>
           <IconDots size={16} />
         </button>
       </div>
@@ -54,27 +54,34 @@ export function RightPanel(): React.JSX.Element {
             key={artist.name}
             type="button"
             className="artist-row"
-            onDoubleClick={() => play(artist.first, library.tracks.filter((t) => (t.albumArtist || t.artist) === artist.name))}
-            title={`Double-clic pour écouter ${artist.name}`}
+            onDoubleClick={() =>
+              play(
+                artist.first,
+                library.tracks.filter((track) => (track.albumArtist || track.artist) === artist.name)
+              )
+            }
+            title={t('artist.listen', { name: artist.name })}
           >
             <Cover src={artist.cover} name={artist.name} size={34} radius={17} />
             <span className="artist-meta">
               <span className="artist-name">{artist.name}</span>
               <span className="artist-sub">
-                {artist.tracks} titre{artist.tracks > 1 ? 's' : ''} • {artist.albums} album
-                {artist.albums > 1 ? 's' : ''}
+                {t('artist.meta', {
+                  tracks: t('artist.tracks', { count: artist.tracks }),
+                  albums: t('artist.albums', { count: artist.albums })
+                })}
               </span>
             </span>
           </button>
         ))}
-        {artists.length === 0 && <p className="panel-empty">Votre bibliothèque est vide.</p>}
+        {artists.length === 0 && <p className="panel-empty">{t('panel.empty')}</p>}
       </div>
 
       <div className="promo">
-        <h3>Uninterrupted Music Awaits</h3>
-        <p>Enjoy ad-free music with our premium plan.</p>
+        <h3>{t('promo.title')}</h3>
+        <p>{t('promo.text')}</p>
         <button type="button" className="promo-cta">
-          Upgrade now
+          {t('promo.cta')}
         </button>
       </div>
     </aside>

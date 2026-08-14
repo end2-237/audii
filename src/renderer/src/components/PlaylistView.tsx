@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import type { Playlist, Track } from '@shared/types'
 import { useAudii, useEngine } from '@/state/AudiiProvider'
-import { formatDuration, plural } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
+import { playlistName } from '@/lib/labels'
 import { IconDots, IconPause, IconPin, IconPlay } from './Icons'
 import { TrackTable } from './TrackTable'
 
@@ -19,7 +20,7 @@ function heroGradient(name: string): string {
 }
 
 export function PlaylistView({ playlist, tracks }: PlaylistViewProps): React.JSX.Element {
-  const { play, current, toggle } = useAudii()
+  const { play, current, toggle, t } = useAudii()
   const { playing } = useEngine()
 
   const isCurrentPlaylist = useMemo(
@@ -43,22 +44,25 @@ export function PlaylistView({ playlist, tracks }: PlaylistViewProps): React.JSX
             playlist.cover
               ? { backgroundImage: `url("${playlist.cover}")` }
               : // Sans pochette, on peint un dégradé stable dérivé du nom.
-                { filter: 'none', background: heroGradient(playlist.name) }
+                { filter: 'none', background: heroGradient(playlist.id) }
           }
           aria-hidden="true"
         />
         <div className="hero-veil" aria-hidden="true" />
         <div className="hero-content">
-          <h1 className="hero-title">{playlist.name}</h1>
+          <h1 className="hero-title">{playlistName(playlist, t)}</h1>
           <p className="hero-sub">
-            Playlist • {plural(tracks.length, 'song', 'songs')} • {formatDuration(duration)}
+            {t('playlist.subtitle', {
+              songs: t('playlist.songs', { count: tracks.length }),
+              duration: formatDuration(duration)
+            })}
           </p>
         </div>
         <button
           type="button"
           className="hero-play"
           onClick={onHeroPlay}
-          title={heroPlaying ? 'Pause' : 'Lire la playlist'}
+          title={t(heroPlaying ? 'player.pause' : 'playlist.play')}
           disabled={tracks.length === 0}
         >
           {heroPlaying ? <IconPause size={24} /> : <IconPlay size={24} />}
@@ -66,10 +70,10 @@ export function PlaylistView({ playlist, tracks }: PlaylistViewProps): React.JSX
       </div>
 
       <div className="playlist-toolbar">
-        <button type="button" className="icon-ghost" title="Options de la playlist">
+        <button type="button" className="icon-ghost" title={t('playlist.options')}>
           <IconDots size={18} />
         </button>
-        <button type="button" className="icon-ghost" title="Épingler">
+        <button type="button" className="icon-ghost" title={t('playlist.pin')}>
           <IconPin size={16} />
         </button>
       </div>

@@ -49,39 +49,72 @@ function roundedRectDistance(x, y, size, radius) {
   return Math.min(Math.max(dx, dy), 0) + Math.hypot(ox, oy) - radius
 }
 
-function ellipseDistance(x, y, cx, cy, rx, ry, angle) {
-  const cos = Math.cos(angle)
-  const sin = Math.sin(angle)
-  const px = (x - cx) * cos + (y - cy) * sin
-  const py = -(x - cx) * sin + (y - cy) * cos
-  const k = Math.hypot(px / rx, py / ry)
-  // Approximation de la distance euclidienne, suffisante pour l'anti-aliasing.
-  return (k - 1) * Math.min(rx, ry)
+/** Distance signée à un triangle convexe (négative à l'intérieur). */
+function triangleDistance(x, y, points) {
+  let inside = -Infinity
+  for (let i = 0; i < 3; i++) {
+    const [ax, ay] = points[i]
+    const [bx, by] = points[(i + 1) % 3]
+    const ex = bx - ax
+    const ey = by - ay
+    // Normale sortante : les sommets sont donnés dans le sens horaire.
+    const len = Math.hypot(ex, ey) || 1
+    const nx = ey / len
+    const ny = -ex / len
+    inside = Math.max(inside, (x - ax) * nx + (y - ay) * ny)
+  }
+  return inside
+}
+
+/** Rétrécit un triangle vers son centre, pour arrondir ses angles ensuite. */
+function shrink(points, amount) {
+  const cx = (points[0][0] + points[1][0] + points[2][0]) / 3
+  const cy = (points[0][1] + points[1][1] + points[2][1]) / 3
+  return points.map(([x, y]) => {
+    const dx = x - cx
+    const dy = y - cy
+    const len = Math.hypot(dx, dy) || 1
+    return [x - (dx / len) * amount * 1.9, y - (dy / len) * amount * 1.9]
+  })
 }
 
 /**
  * Rend l'icône en RGBA (Uint8Array) pour une taille donnée.
- * Les coordonnées sont exprimées en fraction de `size` pour rester nettes
- * de 16 px à 512 px.
+ *
+ * Le monogramme : un « A » massif dont le contrepoinçon est un triangle de
+ * lecture. Deux signes de l'audio en une seule forme, lisible de 16 à 512 px.
  */
 function renderIcon(size) {
   const pixels = new Uint8Array(size * size * 4)
   const u = size / 100 // unité relative
 
   const radius = 23 * u
-  // Note de musique.
-  const headCx = 40 * u
-  const headCy = 68 * u
-  const headRx = 15 * u
-  const headRy = 11.5 * u
-  const headAngle = -0.36
-  const stemX = 51.5 * u
-  const stemW = 6.5 * u
-  const stemTop = 24 * u
-  const stemBot = 69 * u
-  // Drapeau : croissant entre deux cercles.
-  const flagC1 = { x: 47 * u, y: 45 * u, r: 26 * u }
-  const flagC2 = { x: 41.5 * u, y: 52 * u, r: 25 * u }
+  const round = 4 * u
+
+  // « A » : triangle extérieur, sommets dans le sens horaire.
+  const outer = shrink(
+    [
+      [50 * u, 15 * u],
+      [85 * u, 85 * u],
+      [15 * u, 85 * u]
+    ],
+    round
+  )
+  // Contrepoinçon : le vide intérieur de la lettre.
+  const counter = shrink(
+    [
+      [50 * u, 41 * u],
+      [69 * u, 79 * u],
+      [31 * u, 79 * u]
+    ],
+    round * 0.8
+  )
+  // Barre transversale du « A », prolongée à droite comme une onde qui sort
+  // de la lettre : c'est ce détail qui rend le monogramme reconnaissable.
+  const barTop = 62 * u
+  const barBottom = 71 * u
+  const barLeft = 31 * u
+  const barRight = 84 * u
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
@@ -103,27 +136,23 @@ function renderIcon(size) {
       g = mix(g, 160, glow * 0.16)
       b = mix(b, 255, glow * 0.2)
 
-      // Composition de la note (blanche).
-      const head = cover(ellipseDistance(px, py, headCx, headCy, headRx, headRy, headAngle))
-      const stem = Math.min(
-        clamp01(px - stemX + 0.5),
-        clamp01(stemX + stemW - px + 0.5),
-        clamp01(py - stemTop + 0.5),
-        clamp01(stemBot - py + 0.5)
-      )
-      const flag = Math.min(
-        cover(Math.hypot(px - flagC1.x, py - flagC1.y) - flagC1.r),
-        clamp01(Math.hypot(px - flagC2.x, py - flagC2.y) - flagC2.r + 0.5),
-        clamp01(px - stemX + 0.5),
-        clamp01(py - stemTop + 0.5),
-        clamp01(stemTop + 34 * u - py + 0.5)
-      )
+      const letter = triangleDistance(px, py, outer) - round
+      const hole = triangleDistance(px, py, counter) - round * 0.8
+      // Anneau triangulaire : la lettre moins son contrepoinçon.
+      const ring = Math.min(cover(letter), 1 - cover(hole))
 
-      const note = clamp01(Math.max(head, stem, flag))
-      if (note > 0) {
-        r = mix(r, 255, note)
-        g = mix(g, 255, note)
-        b = mix(b, 255, note)
+      // Barre transversale, prolongée à droite comme une onde qui sort de la
+      // lettre : c'est ce détail qui rend le monogramme reconnaissable.
+      const barDx = Math.max(barLeft - px, px - barRight)
+      const barDy = Math.max(barTop - py, py - barBottom)
+      const bar = cover(Math.max(barDx, barDy) - round * 0.4)
+
+      const mark = clamp01(Math.max(ring, bar))
+
+      if (mark > 0) {
+        r = mix(r, 255, mark)
+        g = mix(g, 255, mark)
+        b = mix(b, 255, mark)
       }
 
       const offset = (y * size + x) * 4

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { Library, ScanProgress, Settings } from '../shared/types'
+import type { Library, MiniCommand, PlayerSnapshot, ScanProgress, Settings } from '../shared/types'
 
 export interface SplashStatus {
   message: string
@@ -54,6 +54,16 @@ const api = {
 
   splash: {
     onStatus: (listener: (status: SplashStatus) => void) => subscribe('splash:status', listener)
+  },
+
+  /** Pont entre la fenêtre principale (qui détient le son) et le mini-lecteur. */
+  mini: {
+    publish: (snapshot: PlayerSnapshot): void => ipcRenderer.send('player:publish', snapshot),
+    onState: (listener: (snapshot: PlayerSnapshot) => void) => subscribe('mini:state', listener),
+    send: (command: MiniCommand): void => ipcRenderer.send('mini:command', command),
+    onCommand: (listener: (command: MiniCommand) => void) => subscribe('mini:command', listener),
+    setCollapsed: (collapsed: boolean): void => ipcRenderer.send('mini:collapsed', collapsed),
+    restoreMain: (): void => ipcRenderer.send('mini:restore')
   }
 }
 

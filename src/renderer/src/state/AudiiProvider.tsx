@@ -12,9 +12,13 @@ import {
 import { DEFAULT_SETTINGS, type Library, type ScanProgress, type Settings, type Track } from '@shared/types'
 import { AudioEngine, type EngineState } from '@/audio/engine'
 import { AnalysisQueue } from '@/audio/analyze'
-import { pickNextTrack, tapsToBpm } from '@/audio/vibe'
+import { pickNextTrack, rankFollowUps, tapsToBpm, type FollowUp } from '@/audio/vibe'
+import { buildTempoPlaylists, countUnanalyzed, type TempoPlaylist } from '@/audio/tempo'
+import { trackBpm } from '@/audio/vibe'
+import type { Playlist } from '@shared/types'
+import { translate, type MessageKey, type Params } from '@shared/i18n'
 
-export type View = 'home' | 'playlists' | 'albums' | 'artists'
+export type View = 'home' | 'playlists' | 'albums' | 'artists' | 'tempo' | 'now'
 
 const EMPTY_LIBRARY: Library = { tracks: [], playlists: [], folders: [], scannedAt: 0 }
 
@@ -27,9 +31,21 @@ interface AudiiContextValue {
   search: string
   selectedPlaylistId: string | null
   current: Track | null
+  queue: Track[]
   queueIds: string[]
   tapBpm: number | null
   vibeOpen: boolean
+  /** Playlists tempo générées à la volée depuis les BPM connus. */
+  tempoPlaylists: TempoPlaylist[]
+  /** Morceaux qui peuvent suivre celui en cours, du plus cohérent au moins. */
+  followUps: FollowUp[]
+  /** Nombre de titres dont le tempo reste à estimer. */
+  pendingAnalysis: number
+  /** Playlist des titres aimés (null si aucun). */
+  favorites: Playlist | null
+  platform: string
+  /** Traduction : `t('nav.home')`, `t('tempo.tracks', { count })`. */
+  t: (key: MessageKey, params?: Params) => string
 
   setView: (view: View) => void
   setSearch: (value: string) => void
@@ -46,6 +62,8 @@ interface AudiiContextValue {
   toggleFavorite: (id: string) => void
   tap: () => void
   resetTap: () => void
+  /** Lance l'analyse de tempo sur toute la bibliothèque. */
+  analyzeAll: () => void
 
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
@@ -71,10 +89,6 @@ export function useEngine(): EngineState {
   )
 }
 
-export function useAudioEngine(): AudioEngine {
-  return engine
-}
-
 export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.Element {
   const [library, setLibrary] = useState<Library>(EMPTY_LIBRARY)
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
@@ -88,6 +102,7 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
   const [queueIds, setQueueIds] = useState<string[]>([])
   const [tapBpm, setTapBpm] = useState<number | null>(null)
   const [vibeOpen, setVibeOpen] = useState(false)
+  const [platform, setPlatform] = useState('win32')
 
   const taps = useRef<number[]>([])
   const history = useRef<string[]>([])
@@ -95,6 +110,7 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
   const settingsRef = useRef(settings)
   const queueRef = useRef<string[]>([])
   const currentRef = useRef<Track | null>(null)
+  const selectedRef = useRef<string | null>(null)
 
   const trackById = useMemo(() => {
     const map = new Map<string, Track>()
@@ -109,23 +125,74 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
     [currentId, trackById, lastPlayed]
   )
 
+  const queue = useMemo(
+    () => queueIds.map((id) => trackById.get(id)).filter((track): track is Track => Boolean(track)),
+    [queueIds, trackById]
+  )
+
+  const tempoPlaylists = useMemo(
+    () => buildTempoPlaylists(library.tracks, settings.tempoSort),
+    [library.tracks, settings.tempoSort]
+  )
+
+  const pendingAnalysis = useMemo(() => countUnanalyzed(library.tracks), [library.tracks])
+
+  /** Playlist « Favoris », reconstruite depuis les titres aimés. */
+  const favorites = useMemo<Playlist | null>(() => {
+    const liked = settings.favorites
+      .map((id) => trackById.get(id))
+      .filter((track): track is Track => Boolean(track))
+    if (liked.length === 0) return null
+    return {
+      id: 'favorites',
+      name: 'favorites',
+      kind: 'smart',
+      trackIds: liked.map((track) => track.id),
+      cover: liked.find((track) => track.cover)?.cover ?? null,
+      duration: liked.reduce((total, track) => total + track.duration, 0)
+    }
+  }, [settings.favorites, trackById])
+
+  /**
+   * Suite possible : on classe d'abord dans la file en cours, et on complète
+   * avec le reste de la bibliothèque si la file est trop courte.
+   */
+  const followUps = useMemo(() => {
+    if (!current) return []
+    const pool = queue.length > 1 ? queue : library.tracks
+    return rankFollowUps(pool, current, {
+      energy: settings.energy,
+      tapBpm,
+      history: history.current,
+      styleLock: settings.styleLock
+    }).slice(0, 8)
+  }, [current, queue, library.tracks, settings.energy, settings.styleLock, tapBpm])
+
+  const t = useCallback(
+    (key: MessageKey, params?: Params) => translate(settings.language, key, params),
+    [settings.language]
+  )
+
   libraryRef.current = library
   settingsRef.current = settings
   queueRef.current = queueIds
   currentRef.current = current
+  selectedRef.current = selectedPlaylistId
 
   /* ------------------------------------------------------------ chargement */
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const [loadedSettings, loadedLibrary] = await Promise.all([
+      const [loadedSettings, loadedLibrary, info] = await Promise.all([
         window.audii.settings.get(),
-        window.audii.library.get()
+        window.audii.library.get(),
+        window.audii.info()
       ])
       if (cancelled) return
       setSettings(loadedSettings)
       setLibrary(loadedLibrary)
+      setPlatform(info.platform)
       engine.setVolume(loadedSettings.volume)
       engine.setSensitivity(loadedSettings.noiseSensitivity)
       const fallback = loadedLibrary.playlists[0]?.id ?? null
@@ -134,6 +201,21 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
           ? loadedSettings.lastPlaylistId
           : fallback
       )
+
+      // Reprise : on remet le morceau et sa position, en pause. L'utilisateur
+      // retrouve exactement où il en était sans que le son démarre tout seul.
+      const resume = loadedSettings.resume
+      const track = resume ? loadedLibrary.tracks.find((item) => item.id === resume.trackId) : undefined
+      if (resume && track) {
+        setCurrentId(track.id)
+        setLastPlayed(track)
+        setQueueIds(resume.queueIds.length > 0 ? resume.queueIds : [track.id])
+        if (resume.playlistId && loadedLibrary.playlists.some((p) => p.id === resume.playlistId)) {
+          setSelectedPlaylistId(resume.playlistId)
+        }
+        void engine.load(track.url, false, resume.position)
+      }
+
       setLoading(false)
       window.audii.rendererReady()
     })()
@@ -179,12 +261,31 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
     })
   }
 
-  // Lock-Vibe a besoin des tempos : on analyse la file d'attente en fond.
+  // Lock-Vibe et les playlists tempo ont besoin des BPM : on analyse en fond.
   useEffect(() => {
     if (!settings.lockVibe) return
-    const queue = queueIds.map((id) => trackById.get(id)).filter((t): t is Track => Boolean(t))
-    analysis.current?.push(queue.slice(0, 60))
+    const pending = queueIds.map((id) => trackById.get(id)).filter((t): t is Track => Boolean(t))
+    analysis.current?.push(pending.slice(0, 60))
   }, [settings.lockVibe, queueIds, trackById])
+
+  const analyzeAll = useCallback(() => {
+    analysis.current?.push(libraryRef.current.tracks)
+  }, [])
+
+  /* ---------------------------------------------------- thème & reprise */
+
+  useEffect(() => {
+    const root = document.documentElement
+    const media = window.matchMedia('(prefers-color-scheme: light)')
+    const apply = (): void => {
+      const light = settings.theme === 'light' || (settings.theme === 'system' && media.matches)
+      root.dataset.theme = light ? 'light' : 'dark'
+    }
+    apply()
+    if (settings.theme !== 'system') return
+    media.addEventListener('change', apply)
+    return () => media.removeEventListener('change', apply)
+  }, [settings.theme])
 
   /* --------------------------------------------------------------- lecture */
 
@@ -201,6 +302,61 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
     analysis.current?.prioritize(track)
     void engine.load(track.url, true)
   }, [])
+
+  /**
+   * Sauvegarde périodique de l'écoute en cours. On écrit directement sur
+   * disque sans passer par l'état React : ce champ n'est relu qu'au démarrage,
+   * inutile de re-rendre l'interface toutes les cinq secondes.
+   */
+  const saveResume = useCallback(() => {
+    const track = currentRef.current
+    if (!track) return
+    void window.audii.settings.set({
+      resume: {
+        trackId: track.id,
+        position: engine.state.currentTime,
+        queueIds: queueRef.current,
+        playlistId: selectedRef.current,
+        savedAt: Date.now()
+      }
+    })
+  }, [])
+
+  /**
+   * Le mini-lecteur vit dans une autre fenêtre : on lui pousse l'état de
+   * lecture, et on exécute les commandes qu'il renvoie.
+   */
+  useEffect(() => {
+    const publish = (): void => {
+      const track = currentRef.current
+      window.audii.mini.publish({
+        title: track?.title ?? 'Audii',
+        artist: track?.artist ?? '',
+        cover: track?.cover ?? null,
+        playing: engine.state.playing,
+        position: engine.state.currentTime,
+        duration: engine.state.duration,
+        theme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
+        bpm: track ? trackBpm(track) : null
+      })
+    }
+    const off = engine.subscribe(publish)
+    const timer = setInterval(publish, 1000)
+    return () => {
+      off()
+      clearInterval(timer)
+    }
+  }, [])
+
+  useEffect(() => {
+    const timer = setInterval(saveResume, 5000)
+    window.addEventListener('beforeunload', saveResume)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('beforeunload', saveResume)
+      saveResume()
+    }
+  }, [saveResume])
 
   const advance = useCallback(
     (direction: 1 | -1) => {
@@ -237,7 +393,8 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
         energy: settingsNow.energy,
         tapBpm,
         shuffle: settingsNow.shuffle,
-        history: history.current
+        history: history.current,
+        styleLock: settingsNow.styleLock
       })
       if (!nextTrack) return
 
@@ -254,6 +411,17 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
   useEffect(() => {
     engine.onTrackEnded(() => advance(1))
   }, [advance])
+
+  // Commandes venues du mini-lecteur flottant.
+  useEffect(
+    () =>
+      window.audii.mini.onCommand((command) => {
+        if (command === 'toggle') void engine.toggle()
+        else if (command === 'next') advance(1)
+        else advance(-1)
+      }),
+    [advance]
+  )
 
   /* ----------------------------------------------------------- Noise Sense */
 
@@ -368,9 +536,16 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
       search,
       selectedPlaylistId,
       current,
+      queue,
       queueIds,
       tapBpm,
       vibeOpen,
+      tempoPlaylists,
+      followUps,
+      pendingAnalysis,
+      favorites,
+      platform,
+      t,
       setView,
       setSearch,
       selectPlaylist,
@@ -384,6 +559,7 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
       toggleFavorite,
       tap,
       resetTap,
+      analyzeAll,
       addFolder,
       removeFolder,
       rescan,
@@ -398,9 +574,16 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
       search,
       selectedPlaylistId,
       current,
+      queue,
       queueIds,
       tapBpm,
       vibeOpen,
+      tempoPlaylists,
+      followUps,
+      pendingAnalysis,
+      favorites,
+      platform,
+      t,
       selectPlaylist,
       play,
       advance,
@@ -408,6 +591,7 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
       toggleFavorite,
       tap,
       resetTap,
+      analyzeAll,
       addFolder,
       removeFolder,
       rescan

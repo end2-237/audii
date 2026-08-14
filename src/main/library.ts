@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import * as mm from 'music-metadata'
+import { translate, type Lang } from '../shared/i18n'
 import { AUDIO_EXTENSIONS, type Library, type Playlist, type ScanProgress, type Track } from '../shared/types'
 import { mediaUrl } from './protocol'
 import { store } from './store'
@@ -123,7 +124,8 @@ async function toTrack(
   }
 
   const common = meta?.common
-  const artist = common?.artist?.trim() || common?.albumartist?.trim() || 'Artiste inconnu'
+  // Vide plutôt qu'un libellé figé : l'interface traduit à l'affichage.
+  const artist = common?.artist?.trim() || common?.albumartist?.trim() || ''
   const album = common?.album?.trim() || path.basename(path.dirname(file))
   const albumArtist = common?.albumartist?.trim() || artist
   const albumKey = `${albumArtist.toLowerCase()}::${album.toLowerCase()}`
@@ -180,7 +182,7 @@ function buildPlaylists(tracks: Track[]): Playlist[] {
     const sorted = [...tracks].sort((a, b) => b.addedAt - a.addedAt)
     playlists.push({
       id: 'all',
-      name: 'Toute la musique',
+      name: 'all',
       kind: 'smart',
       trackIds: sorted.map((t) => t.id),
       cover: sorted.find((t) => t.cover)?.cover ?? null,
@@ -216,11 +218,13 @@ export type ProgressReporter = (progress: ScanProgress) => void
 
 let scanning = false
 
-export async function scanLibrary(folders: string[], report: ProgressReporter): Promise<Library> {
-  if (scanning) throw new Error('Un scan est déjà en cours')
+export async function scanLibrary(folders: string[], report: ProgressReporter, lang: Lang = 'fr'): Promise<Library> {
+  const t = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) =>
+    translate(lang, key, params)
+  if (scanning) throw new Error(t('error.scanRunning'))
   scanning = true
   try {
-    report({ phase: 'discovering', current: 0, total: 0, file: '', message: 'Exploration des dossiers…' })
+    report({ phase: 'discovering', current: 0, total: 0, file: '', message: t('scanner.exploring') })
 
     const discovered: { file: string; root: string }[] = []
     for (const folder of folders) {
@@ -232,7 +236,7 @@ export async function scanLibrary(folders: string[], report: ProgressReporter): 
         current: discovered.length,
         total: discovered.length,
         file: folder,
-        message: `${discovered.length} fichier(s) trouvé(s)`
+        message: t('scanner.found', { count: discovered.length })
       })
     }
 
@@ -258,7 +262,7 @@ export async function scanLibrary(folders: string[], report: ProgressReporter): 
           current: done,
           total: unique.length,
           file: path.basename(file),
-          message: 'Lecture des métadonnées…'
+          message: t('scanner.reading')
         })
       }
       return track
@@ -288,7 +292,7 @@ export async function scanLibrary(folders: string[], report: ProgressReporter): 
       current: tracks.length,
       total: tracks.length,
       file: '',
-      message: `${tracks.length} morceau(x) dans la bibliothèque`
+      message: t('scanner.done', { count: tracks.length })
     })
     return library
   } finally {

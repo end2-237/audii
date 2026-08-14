@@ -2,6 +2,7 @@
  * Types partagés entre le process principal (Node) et le renderer (React).
  * Ne jamais importer de module Node ici : ce fichier est bundlé des deux côtés.
  */
+import type { Lang } from './i18n'
 
 export interface Track {
   /** Identifiant stable dérivé du chemin absolu. */
@@ -63,6 +64,33 @@ export interface ScanProgress {
   message: string
 }
 
+export type ThemeMode = 'dark' | 'light' | 'system'
+
+/** Sens de tri des playlists tempo. */
+export type SortDirection = 'desc' | 'asc'
+
+/**
+ * Profil local. Audii n'a pas encore de serveur : le « compte » vit sur la
+ * machine et sert d'identité d'affichage + préférences.
+ */
+export interface Profile {
+  name: string
+  email: string
+  /** Teinte de l'avatar généré (0-359). */
+  hue: number
+  createdAt: number
+}
+
+/** Ce qui était en cours d'écoute à la fermeture. */
+export interface ResumeState {
+  trackId: string
+  /** Position de lecture en secondes. */
+  position: number
+  queueIds: string[]
+  playlistId: string | null
+  savedAt: number
+}
+
 export interface Settings {
   folders: string[]
   volume: number
@@ -74,7 +102,31 @@ export interface Settings {
   repeat: 'off' | 'all' | 'one'
   lastPlaylistId: string | null
   favorites: string[]
+  theme: ThemeMode
+  language: Lang
+  profile: Profile | null
+  resume: ResumeState | null
+  /** Sens de tri des playlists tempo générées automatiquement. */
+  tempoSort: SortDirection
+  /** Rester dans le même univers musical lors des enchaînements. */
+  styleLock: boolean
+  /** Position mémorisée du mini-lecteur flottant. */
+  miniPosition: { x: number; y: number } | null
 }
+
+/** État de lecture publié vers le mini-lecteur. */
+export interface PlayerSnapshot {
+  title: string
+  artist: string
+  cover: string | null
+  playing: boolean
+  position: number
+  duration: number
+  theme: 'dark' | 'light'
+  bpm: number | null
+}
+
+export type MiniCommand = 'toggle' | 'next' | 'previous'
 
 export interface AnalysisResult {
   bpm: number | null
@@ -91,7 +143,14 @@ export const DEFAULT_SETTINGS: Settings = {
   shuffle: false,
   repeat: 'off',
   lastPlaylistId: null,
-  favorites: []
+  favorites: [],
+  theme: 'dark',
+  language: 'fr',
+  profile: null,
+  resume: null,
+  tempoSort: 'desc',
+  styleLock: true,
+  miniPosition: null
 }
 
 export const AUDIO_EXTENSIONS = [

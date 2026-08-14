@@ -25,12 +25,3 @@ export function formatDate(timestamp: number): string {
   if (Number.isNaN(date.getTime())) return '—'
   return `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`
 }
-
-export function formatCount(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`
-  if (value >= 1000) return `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}K`
-  return String(value)
-}
-
-export const plural = (count: number, one: string, many: string): string =>
-  `${count} ${count > 1 ? many : one}`

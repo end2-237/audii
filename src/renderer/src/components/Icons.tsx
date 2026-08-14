@@ -199,19 +199,106 @@ export const IconClose = ({ size = 14, className }: IconProps) => (
   </svg>
 )
 
-/** Logo Audii : carré arrondi dégradé + note blanche. */
-export const Logo = ({ size = 26, radius = 8 }: { size?: number; radius?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="audii-logo" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#FF2D8E" />
-        <stop offset="1" stopColor="#8A2AF6" />
-      </linearGradient>
-    </defs>
-    <rect width="32" height="32" rx={radius} fill="url(#audii-logo)" />
-    <path
-      d="M16.6 8.2v9.9c0 1.7-1.6 3-3.5 3s-3.5-1.3-3.5-3 1.6-3 3.5-3c.6 0 1.1.1 1.6.3V7.4l6.4 2.7c1.5.7 2.4 2 2.4 3.6 0 .9-.3 1.7-.8 2.4l-1.4-1c.3-.4.5-.9.5-1.4 0-.9-.5-1.6-1.3-2l-3.9-1.6Z"
-      fill="#fff"
-    />
+export const IconMinimize = ({ size = 14, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M5 12h14" {...stroke} strokeWidth={1.5} />
   </svg>
 )
+
+export const IconMaximize = ({ size = 14, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <rect x="5.5" y="5.5" width="13" height="13" rx="1.5" {...stroke} strokeWidth={1.5} />
+  </svg>
+)
+
+export const IconRestore = ({ size = 14, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <rect x="4.5" y="7.5" width="11" height="11" rx="1.5" {...stroke} strokeWidth={1.5} />
+    <path d="M8 5.5h9a1.5 1.5 0 0 1 1.5 1.5v9" {...stroke} strokeWidth={1.5} />
+  </svg>
+)
+
+export const IconCheck = ({ size = 14, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="m5 12.5 4.5 4.5L19 7" {...stroke} strokeWidth={2.2} />
+  </svg>
+)
+
+export const IconUser = ({ size = 16, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="12" cy="8.5" r="3.8" {...stroke} />
+    <path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" {...stroke} />
+  </svg>
+)
+
+export const IconSun = ({ size = 16, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="12" cy="12" r="4" {...stroke} />
+    <path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6l1.4 1.4m10 10 1.4 1.4m0-12.8-1.4 1.4m-10 10L5.6 18.4" {...stroke} />
+  </svg>
+)
+
+export const IconMoon = ({ size = 16, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" {...stroke} />
+  </svg>
+)
+
+export const IconArrowDown = ({ size = 14, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 4.5v15m0 0 5-5m-5 5-5-5" {...stroke} />
+  </svg>
+)
+
+export const IconArrowUp = ({ size = 14, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 19.5v-15m0 0 5 5m-5-5-5 5" {...stroke} />
+  </svg>
+)
+
+export const IconChevronDown = ({ size = 16, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="m6 9.5 6 6 6-6" {...stroke} />
+  </svg>
+)
+
+export const IconSparkle = ({ size = 16, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9 12 3.5Z" {...stroke} />
+    <path d="M18.5 16.5 19.2 18.6 21.3 19.3 19.2 20 18.5 22.1 17.8 20 15.7 19.3 17.8 18.6 18.5 16.5Z" {...stroke} strokeWidth={1.2} />
+  </svg>
+)
+
+/**
+ * Logo Audii : monogramme « A » dans une tuile arrondie dégradée.
+ *
+ * La lettre est un anneau triangulaire dont la barre transversale déborde à
+ * droite, comme une onde qui s'échappe — c'est ce débord qui distingue la
+ * marque d'un simple « A » géométrique. Le tracé est identique à celui de
+ * l'icône Windows (voir `scripts/gen-icons.mjs`).
+ */
+export const Logo = ({ size = 26, radius = 8 }: { size?: number; radius?: number }) => {
+  const rx = (radius / size) * 100
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="audii-logo" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FF2D8E" />
+          <stop offset="1" stopColor="#8A2AF6" />
+        </linearGradient>
+      </defs>
+      <rect width="100" height="100" rx={rx} fill="url(#audii-logo)" />
+      {/* Lettre pleine, angles adoucis par la jointure ronde du contour. */}
+      <path d="M50 18 L82 82 L18 82 Z" fill="#fff" stroke="#fff" strokeWidth="7" strokeLinejoin="round" />
+      {/* Contrepoinçon, repeint dans le dégradé de la tuile. */}
+      <path
+        d="M50 42 L67 77 L33 77 Z"
+        fill="url(#audii-logo)"
+        stroke="url(#audii-logo)"
+        strokeWidth="5"
+        strokeLinejoin="round"
+      />
+      <rect x="31" y="62" width="53" height="9" rx="3.5" fill="#fff" />
+    </svg>
+  )
+}

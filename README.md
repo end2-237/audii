@@ -18,6 +18,13 @@ viendront après validation de cette base.
 | **Noise Sense / Smart Dim** | ✅ | Le micro mesure le bruit ambiant ; au-dessus du seuil le volume tombe à 20 %, puis remonte en fondu |
 | **Analyse locale du tempo** | ✅ | Estimation BPM + énergie en local, sans réseau, mise en cache sur disque |
 | **Splash screen** | ✅ | Fenêtre animée pendant le scan de la bibliothèque |
+| **Playlists tempo automatiques** | ✅ | Une playlist par tranche de 10 BPM, triable du plus rapide au plus lent ou l'inverse |
+| **« Continuer sur ce rythme »** | ✅ | Sur la page du morceau : ce qui peut suivre, classé par tempo **et** style |
+| **Profil local & reprise d'écoute** | ✅ | Écran d'accueil, et l'app rouvre sur le morceau et la seconde où vous l'aviez laissée |
+| **Coups de cœur** | ✅ | Les titres aimés forment leur propre playlist, en haut de la barre latérale |
+| **Thème clair / sombre / système** | ✅ | Bascule instantanée depuis la barre de titre ou le panneau moteur |
+| **Français / English** | ✅ | Interface entièrement traduite des deux côtés, bascule dans les réglages |
+| **Mini-lecteur flottant** | ✅ | À la réduction : un bandeau au-dessus des autres fenêtres, repliable en pastille |
 | **Motion-Sync (cadence de marche)** | ⏳ | Mobile uniquement — hors périmètre desktop |
 | **Streaming Audiomack / SoundCloud / Spotify** | ⏳ | Prochaine itération |
 | **Paiement Mobile Money** | ⏳ | Prochaine itération |
@@ -87,11 +94,12 @@ src/
 │   ├── library.ts     scan récursif + lecture des tags (music-metadata)
 │   ├── protocol.ts    protocole audii:// (streaming local avec requêtes Range)
 │   ├── store.ts       persistance JSON (réglages, bibliothèque, cache d'analyse)
+│   ├── mini.ts        fenêtre flottante du mini-lecteur
 │   └── smoke.ts       test de fumée piloté par variable d'environnement
 ├── preload/       pont contextIsolation → window.audii
-├── shared/        types partagés main ↔ renderer
+├── shared/        types partagés + dictionnaire de traductions
 └── renderer/      interface React (maquette Audii)
-    ├── src/audio/     moteur de lecture, analyse BPM, sélection Lock-Vibe
+    ├── src/audio/     lecture, analyse BPM, familles de style, playlists tempo
     ├── src/state/     contexte applicatif
     ├── src/components/
     └── src/styles/
@@ -124,6 +132,19 @@ Mesuré sur la bibliothèque de test (`scripts/make-fixtures.mjs`) :
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Estimé | 72 | 87 | 92 | 103 | 110 | 117 | 129 | 152 |
 
+### Rester dans le style
+
+Enchaîner au BPM seul ferait passer d'un gospel à un morceau de drill parce que les deux
+tournent à 140. Chaque titre est donc rangé dans une famille musicale déduite de son tag de
+genre (afro, hip-hop, R&B, électro, gospel, reggae, latino…), avec repli sur l'artiste,
+l'album et le dossier quand le tag manque — ce qui est fréquent sur des fichiers récupérés
+sur WhatsApp.
+
+Le score d'enchaînement pèse **55 % de style et 45 % de tempo**, et le réglage
+« Rester dans le style » restreint carrément les candidats au même univers dès qu'il y en a
+au moins trois. La pastille de style affichée dans « Continuer sur ce rythme » rend le
+garde-fou visible.
+
 ### Noise Sense
 
 Le micro alimente un `AnalyserNode` (annulation d'écho activée pour que la musique ne se
@@ -131,6 +152,11 @@ déclenche pas elle-même). Une ligne de base du niveau calme de la pièce est s
 continu ; au-delà du seuil, le gain descend à 20 % en attaque rapide et remonte
 progressivement 1,8 s après le retour au calme. Le micro n'est jamais connecté à la sortie
 et rien n'est enregistré.
+
+L'écoute tourne sur un `setInterval`, pas sur `requestAnimationFrame` : le navigateur ne
+produit plus d'images quand la fenêtre est réduite, ce qui gèlerait la surveillance. La
+fenêtre désactive aussi `backgroundThrottling`, sinon Chromium ralentit les minuteries des
+fenêtres masquées.
 
 ---
 
@@ -143,6 +169,17 @@ et rien n'est enregistré.
 | `Ctrl + ←` / `Ctrl + →` | Morceau précédent / suivant |
 | `T` | Tap-Tempo |
 | `Ctrl + F` | Recherche |
+
+---
+
+## Langues
+
+L'interface est disponible en **français** et en **anglais**, intégralement — y compris les
+messages du splash et du scan, qui viennent du process principal. La bascule se trouve dans
+le panneau **Moteur Audii** et sur l'écran d'accueil. Le dictionnaire unique vit dans
+`src/shared/i18n.ts` ; ajouter une langue revient à y ajouter une table.
+
+Le test de fumée vérifie qu'aucun mot français ne subsiste après bascule en anglais.
 
 ---
 

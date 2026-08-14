@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { useAudii, useEngine } from '@/state/AudiiProvider'
 import { formatTime } from '@/lib/format'
+import { artistName } from '@/lib/labels'
 import { Cover } from './Cover'
 import {
   IconExpand,
@@ -74,7 +75,7 @@ function Seekbar(): React.JSX.Element {
 }
 
 export function PlayerBar(): React.JSX.Element {
-  const { current, settings, update, toggle, next, previous, toggleFavorite, setVibeOpen, vibeOpen } = useAudii()
+  const { current, settings, update, toggle, next, previous, toggleFavorite, setView, view, t } = useAudii()
   const { playing, dim, error } = useEngine()
   const liked = current ? settings.favorites.includes(current.id) : false
   const muted = settings.volume === 0
@@ -89,29 +90,36 @@ export function PlayerBar(): React.JSX.Element {
       <div className="player-now">
         {current ? (
           <>
-            <Cover src={current.cover} name={current.album || current.title} size={44} radius={6} />
-            <div className="player-text">
-              <span className="player-title" title={current.title}>
-                {current.title}
+            <button
+              type="button"
+              className="player-open"
+              title={t('player.openTrack')}
+              onClick={() => setView('now')}
+            >
+              <Cover src={current.cover} name={current.album || current.title} size={44} radius={6} />
+              <span className="player-text">
+                <span className="player-title" title={current.title}>
+                  {current.title}
+                </span>
+                <span className="player-artist" title={artistName(current, t)}>
+                  {error ? t(error) : artistName(current, t)}
+                </span>
               </span>
-              <span className="player-artist" title={current.artist}>
-                {error ?? current.artist}
-              </span>
-            </div>
+            </button>
           </>
         ) : (
           <>
             <Cover name="Audii" size={44} radius={6} />
             <div className="player-text">
-              <span className="player-title">Rien en lecture</span>
-              <span className="player-artist">Choisissez un morceau</span>
+              <span className="player-title">{t('player.nothing')}</span>
+              <span className="player-artist">{t('player.choose')}</span>
             </div>
           </>
         )}
         <button
           type="button"
           className={`icon-ghost heart${liked ? ' is-liked' : ''}`}
-          title="Ajouter aux favoris"
+          title={t('player.favorite')}
           disabled={!current}
           onClick={() => current && toggleFavorite(current.id)}
         >
@@ -121,13 +129,13 @@ export function PlayerBar(): React.JSX.Element {
 
       <div className="player-center">
         <div className="transport">
-          <button type="button" className="icon-ghost" title="Précédent" onClick={previous}>
+          <button type="button" className="icon-ghost" title={t('player.prev')} onClick={previous}>
             <IconPrev size={19} />
           </button>
-          <button type="button" className="play-button" title={playing ? 'Pause' : 'Lire'} onClick={toggle}>
+          <button type="button" className="play-button" title={t(playing ? 'player.pause' : 'player.play')} onClick={toggle}>
             {playing ? <IconPause size={17} /> : <IconPlay size={17} />}
           </button>
-          <button type="button" className="icon-ghost" title="Suivant" onClick={next}>
+          <button type="button" className="icon-ghost" title={t('player.next')} onClick={next}>
             <IconNext size={19} />
           </button>
         </div>
@@ -138,7 +146,7 @@ export function PlayerBar(): React.JSX.Element {
         <button
           type="button"
           className={`icon-ghost${settings.shuffle ? ' is-on' : ''}`}
-          title="Lecture aléatoire"
+          title={t('player.shuffle')}
           onClick={() => update({ shuffle: !settings.shuffle })}
         >
           <IconShuffle size={18} />
@@ -146,7 +154,7 @@ export function PlayerBar(): React.JSX.Element {
         <button
           type="button"
           className={`icon-ghost${settings.repeat !== 'off' ? ' is-on' : ''}`}
-          title={`Répétition : ${settings.repeat}`}
+          title={t('player.repeat', { mode: t(`repeat.${settings.repeat}`) })}
           onClick={cycleRepeat}
         >
           {settings.repeat === 'one' ? <IconRepeatOne size={18} /> : <IconRepeat size={18} />}
@@ -156,7 +164,7 @@ export function PlayerBar(): React.JSX.Element {
           <button
             type="button"
             className="icon-ghost"
-            title={dim < 0.95 ? 'Smart Dim actif' : 'Volume'}
+            title={t(dim < 0.95 ? 'player.smartDim' : 'player.volume')}
             onClick={() => update({ volume: muted ? 0.8 : 0 })}
           >
             {muted ? <IconVolumeMute size={18} /> : <IconVolume size={18} />}
@@ -169,15 +177,15 @@ export function PlayerBar(): React.JSX.Element {
             step={0.01}
             value={settings.volume}
             onChange={(event) => update({ volume: Number(event.target.value) })}
-            aria-label="Volume"
+            aria-label={t('player.volume')}
           />
         </div>
 
         <button
           type="button"
-          className={`icon-ghost${vibeOpen ? ' is-on' : ''}`}
-          title="Moteur Audii (Lock-Vibe, énergie, Noise Sense)"
-          onClick={() => setVibeOpen(!vibeOpen)}
+          className={`icon-ghost${view === 'now' ? ' is-on' : ''}`}
+          title={t('player.trackPage')}
+          onClick={() => setView(view === 'now' ? 'playlists' : 'now')}
         >
           <IconExpand size={18} />
         </button>

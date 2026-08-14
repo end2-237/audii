@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import type { Track } from '@shared/types'
 import { useAudii } from '@/state/AudiiProvider'
-import { formatDate, plural } from '@/lib/format'
+import { formatDate } from '@/lib/format'
+import { artistName } from '@/lib/labels'
 import { Cover } from './Cover'
 import { IconPlay } from './Icons'
 
@@ -13,7 +14,12 @@ interface Group {
   tracks: Track[]
 }
 
-function groupBy(tracks: Track[], mode: 'album' | 'artist'): Group[] {
+function groupBy(
+  tracks: Track[],
+  mode: 'album' | 'artist',
+  albumsLabel: (count: number) => string,
+  unknown: string
+): Group[] {
   const map = new Map<string, Track[]>()
   for (const track of tracks) {
     const key = mode === 'album' ? `${track.albumArtist}::${track.album}` : track.albumArtist || track.artist
@@ -24,11 +30,11 @@ function groupBy(tracks: Track[], mode: 'album' | 'artist'): Group[] {
   return [...map.entries()]
     .map(([key, items]) => ({
       key,
-      title: mode === 'album' ? items[0].album : items[0].albumArtist || items[0].artist,
+      title: mode === 'album' ? items[0].album : items[0].albumArtist || items[0].artist || unknown,
       subtitle:
         mode === 'album'
-          ? items[0].albumArtist || items[0].artist
-          : plural(new Set(items.map((t) => t.album)).size, 'album', 'albums'),
+          ? items[0].albumArtist || items[0].artist || unknown
+          : albumsLabel(new Set(items.map((item) => item.album)).size),
       cover: items.find((track) => track.cover)?.cover ?? null,
       tracks: items
     }))
@@ -41,7 +47,7 @@ interface GridViewProps {
 }
 
 export function GridView({ mode, tracks }: GridViewProps): React.JSX.Element {
-  const { play } = useAudii()
+  const { play, t } = useAudii()
 
   const groups = useMemo<Group[]>(() => {
     if (mode === 'recent') {
@@ -51,21 +57,21 @@ export function GridView({ mode, tracks }: GridViewProps): React.JSX.Element {
         .map((track) => ({
           key: track.id,
           title: track.title,
-          subtitle: `${track.artist} • ${formatDate(track.addedAt)}`,
+          subtitle: `${artistName(track, t)} • ${formatDate(track.addedAt)}`,
           cover: track.cover,
           tracks: [track]
         }))
     }
-    return groupBy(tracks, mode)
-  }, [mode, tracks])
+    return groupBy(tracks, mode, (count) => t('artist.albums', { count }), t('track.unknownArtist'))
+  }, [mode, tracks, t])
 
-  const title = mode === 'album' ? 'Albums' : mode === 'artist' ? 'Artists' : 'Ajoutés récemment'
+  const title = t(mode === 'album' ? 'grid.albums' : mode === 'artist' ? 'grid.artists' : 'grid.recent')
 
   return (
     <section className="grid-view">
       <header className="grid-head">
         <h1>{title}</h1>
-        <span>{plural(groups.length, 'élément', 'éléments')}</span>
+        <span>{t('grid.items', { count: groups.length })}</span>
       </header>
       <div className={`grid${mode === 'artist' ? ' is-round' : ''}`}>
         {groups.map((group) => (
