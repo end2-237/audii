@@ -16,12 +16,14 @@ compression: normal
 
 win:
   icon: build/icon.ico
-  artifactName: ${productName}-${version}-${arch}-${ext}
+  # Deux architectures : un binaire x64 ne démarre pas sur un PC ARM64, et
+  # Windows y répond par « cette application ne peut pas s'exécuter sur votre
+  # PC ». L'architecture figure dans le nom du fichier pour ne pas se tromper.
   target:
     - target: nsis
-      arch: [x64]
+      arch: [x64, arm64]
     - target: portable
-      arch: [x64]
+      arch: [x64, arm64]
 
 nsis:
   oneClick: false
@@ -41,10 +43,10 @@ nsis:
   # elle-même n'était pas en cause ; on retire simplement ce lancement.
   runAfterFinish: false
   deleteAppDataOnUninstall: false
-  artifactName: ${productName}-Setup-${version}.${ext}
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
 
 portable:
-  artifactName: ${productName}-${version}-portable.${ext}
+  artifactName: ${productName}-${version}-${arch}-portable.${ext}
   requestExecutionLevel: user
 
 mac:
