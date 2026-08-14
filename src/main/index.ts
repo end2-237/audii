@@ -82,8 +82,8 @@ function createMainWindow(): void {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
-      // Le renderer analyse le BPM en décodant les fichiers via fetch(audii://).
+      // Le preload n'utilise que contextBridge/ipcRenderer : compatible bac à sable.
+      sandbox: true,
       webSecurity: true
     }
   })
@@ -174,7 +174,7 @@ async function boot(): Promise<void> {
       splashStatus(`${cached.tracks.length} morceaux en cache`, 0.9)
       bootDone = true
       revealMainWindow()
-      void rescan(settings.folders, true)
+      void rescan(settings.folders)
       return
     }
 
@@ -207,15 +207,12 @@ async function boot(): Promise<void> {
 
 let rescanning = false
 
-/** Re-scan silencieux (au démarrage) ou déclenché par l'utilisateur. */
-async function rescan(folders: string[], silent = false): Promise<Library> {
+/** Re-scan de la bibliothèque : au démarrage (en fond) ou à la demande. */
+async function rescan(folders: string[]): Promise<Library> {
   if (rescanning) return store.getLibrary()
   rescanning = true
   try {
-    const report = (progress: ScanProgress) => {
-      broadcast('library:progress', silent ? { ...progress, message: progress.message } : progress)
-    }
-    const library = await scanLibrary(folders, report)
+    const library = await scanLibrary(folders, (progress) => broadcast('library:progress', progress))
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('library:updated', library)
     return library
   } catch (error) {
