@@ -112,18 +112,60 @@ jobs:
           path: smoke-win/
           if-no-files-found: warn
 
-      - name: Installateur NSIS
+      # Un artefact par fichier, et non un paquet des trois architectures :
+      # GitHub ne sait pas donner de lien vers un fichier *dans* un artefact,
+      # donc tout regrouper obligeait à télécharger 328 Mo pour en installer
+      # 82. Chaque téléchargement ne contient plus que ce qu'on a demandé.
+      - name: Installateur x64
         uses: actions/upload-artifact@v4
         with:
-          name: Audii-Setup-Windows
-          path: release/Audii-Setup-*.exe
+          name: Audii-Setup-x64
+          path: release/Audii-Setup-*-x64.exe
           if-no-files-found: error
 
-      - name: Version portable
+      - name: Installateur ARM64
         uses: actions/upload-artifact@v4
         with:
-          name: Audii-Portable-Windows
-          path: release/Audii-*-portable.exe
+          name: Audii-Setup-arm64
+          path: release/Audii-Setup-*-arm64.exe
+          if-no-files-found: error
+
+      # Le fichier sans suffixe d'architecture : il porte les deux, donc il
+      # pèse le double. Utile seulement quand on ignore la machine cible.
+      # Désigné par exclusion plutôt que par un motif de version, qui casserait
+      # au premier numéro à deux chiffres.
+      - name: Installateur universel
+        uses: actions/upload-artifact@v4
+        with:
+          name: Audii-Setup-universel
+          path: |
+            release/Audii-Setup-*.exe
+            !release/Audii-Setup-*-x64.exe
+            !release/Audii-Setup-*-arm64.exe
+          if-no-files-found: error
+
+      - name: Portable x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: Audii-Portable-x64
+          path: release/Audii-*-x64-portable.exe
+          if-no-files-found: error
+
+      - name: Portable ARM64
+        uses: actions/upload-artifact@v4
+        with:
+          name: Audii-Portable-arm64
+          path: release/Audii-*-arm64-portable.exe
+          if-no-files-found: error
+
+      - name: Portable universel
+        uses: actions/upload-artifact@v4
+        with:
+          name: Audii-Portable-universel
+          path: |
+            release/Audii-*-portable.exe
+            !release/Audii-*-x64-portable.exe
+            !release/Audii-*-arm64-portable.exe
           if-no-files-found: error
 
   release:
