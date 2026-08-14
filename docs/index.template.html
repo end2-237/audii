@@ -950,31 +950,34 @@
   <span class="kicker">Version 0.1.0 · Windows</span>
   <h2>Télécharger Audii</h2>
   <p>
-    Si vous ne savez pas quel processeur équipe votre PC, prenez l’installateur universel : il
-    contient les deux architectures et choisit la bonne tout seul. Pour vérifier, tapez
-    <code>$env:PROCESSOR_ARCHITECTURE</code> dans PowerShell.
+    Presque tous les PC sont en x64 : prenez celui-là. Pour en avoir le cœur net, tapez
+    <code>$env:PROCESSOR_ARCHITECTURE</code> dans PowerShell — <code>AMD64</code> veut dire x64.
+    Si vous ne pouvez pas vérifier, l’installateur universel porte les deux architectures et choisit
+    tout seul, au prix du double de poids. Comptez environ 277 Mo sur le disque une fois installé :
+    c’est le poids d’Electron, qui embarque son propre moteur de rendu.
   </p>
 
   <div class="grid">
     <a class="dl is-primary" href="https://github.com/end2-237/audii/releases">
-      <strong>Installateur universel</strong>
-      <span>Contient x64 et ARM64. Windows prend la bonne version à l’installation.</span>
-      <em>Audii-Setup-0.1.0.exe</em>
-    </a>
-    <a class="dl" href="https://github.com/end2-237/audii/releases">
       <strong>Installateur x64</strong>
       <span>Pour les PC Intel et AMD, soit l’immense majorité des machines.</span>
-      <em>Audii-Setup-0.1.0-x64.exe</em>
+      <em>Audii-Setup-0.1.0-x64.exe · 81 Mo</em>
     </a>
     <a class="dl" href="https://github.com/end2-237/audii/releases">
       <strong>Installateur ARM64</strong>
       <span>Pour les PC à processeur ARM — Surface Pro X, Snapdragon X.</span>
-      <em>Audii-Setup-0.1.0-arm64.exe</em>
+      <em>Audii-Setup-0.1.0-arm64.exe · 76 Mo</em>
     </a>
     <a class="dl" href="https://github.com/end2-237/audii/releases">
       <strong>Version portable</strong>
       <span>Aucune installation : le fichier se lance tel quel, depuis une clé USB si besoin.</span>
-      <em>Audii-0.1.0-portable.exe</em>
+      <em>x64 81 Mo · ARM64 75 Mo</em>
+    </a>
+    <a class="dl" href="https://github.com/end2-237/audii/releases">
+      <strong>Installateur universel</strong>
+      <span>Porte les deux architectures, donc pèse le double. À prendre seulement si vous ignorez
+        quel processeur équipe la machine.</span>
+      <em>Audii-Setup-0.1.0.exe · 156 Mo</em>
     </a>
   </div>
 
