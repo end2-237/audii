@@ -1,0 +1,11 @@
+# Le déploiement ne sert qu'une page statique : tout le reste du dépôt —
+# l'application Electron, ses dépendances et ses paquets — n'a rien à faire
+# dans l'archive envoyée à Vercel.
+node_modules/
+dist/
+release/
+build/
+src/
+smoke*/
+.github/
+docs/index.html

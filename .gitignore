@@ -8,3 +8,6 @@ smoke/
 *.log
 .DS_Store
 .vite/
+
+# Sortie du build de la landing (regénérée par `npm run landing`).
+web/
