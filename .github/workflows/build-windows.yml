@@ -72,6 +72,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --win --publish never
 
+      # Le poids se discute sur des chiffres, pas sur des impressions : on
+      # mesure ce que l'utilisateur télécharge et ce qui reste sur son disque.
+      - name: Poids du paquet
+        run: |
+          $dossier = (Get-ChildItem release\win-unpacked -Recurse -File |
+            Measure-Object -Property Length -Sum).Sum
+          Write-Host ("Installé (x64) : {0:N0} Mo" -f ($dossier / 1MB))
+          Get-ChildItem release\*.exe | Sort-Object Length | ForEach-Object {
+            Write-Host ("{0,-40} {1,8:N0} Mo" -f $_.Name, ($_.Length / 1MB))
+          }
+
       # Le paquet Linux était vérifié, pas le binaire Windows : on lance
       # réellement l'exécutable empaqueté avant de publier quoi que ce soit.
       - name: Génération d'une bibliothèque de test
