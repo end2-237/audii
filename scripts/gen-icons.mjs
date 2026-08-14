@@ -1,14 +1,16 @@
 /**
- * Génère l'icône de l'application (build/icon.ico + build/icon.png) sans
- * dépendance native : rasterisation maison puis encodage PNG/ICO.
+ * Génère l'icône de l'application (build/icon.ico + build/icon.png).
  *
- * Le logo reprend celui de l'interface : carré arrondi dégradé magenta ->
- * violet, note de musique blanche.
+ * Le dessin est rasterisé ici (aucune dépendance native), mais l'encodage
+ * ICO est délégué à png2icons : un .ico même légèrement mal formé corrompt
+ * la section de ressources de l'exécutable Windows, qui perd alors son
+ * icône et refuse de démarrer. Ce format ne se bricole pas à la main.
  */
 import { deflateSync } from 'node:zlib'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import png2icons from 'png2icons'
 
 const root = path.dirname(fileURLToPath(new URL('../package.json', import.meta.url)))
 const outDir = path.join(root, 'build')
@@ -195,76 +197,19 @@ function encodePng(pixels, size) {
   ])
 }
 
-/* ------------------------------------------------------------ ICO encoder */
-
-/** Entrée ICO au format DIB 32 bits (attendu par Windows pour les p'tites tailles). */
-function encodeDib(pixels, size) {
-  const header = Buffer.alloc(40)
-  header.writeUInt32LE(40, 0)
-  header.writeInt32LE(size, 4)
-  header.writeInt32LE(size * 2, 8) // XOR + AND
-  header.writeUInt16LE(1, 12)
-  header.writeUInt16LE(32, 14)
-  header.writeUInt32LE(size * size * 4, 20)
-
-  const xor = Buffer.alloc(size * size * 4)
-  for (let y = 0; y < size; y++) {
-    const src = (size - 1 - y) * size * 4 // bottom-up
-    for (let x = 0; x < size; x++) {
-      const s = src + x * 4
-      const d = (y * size + x) * 4
-      xor[d] = pixels[s + 2]
-      xor[d + 1] = pixels[s + 1]
-      xor[d + 2] = pixels[s]
-      xor[d + 3] = pixels[s + 3]
-    }
-  }
-  const maskRow = Math.ceil(size / 32) * 4
-  const and = Buffer.alloc(maskRow * size) // masque vide : l'alpha suffit
-  return Buffer.concat([header, xor, and])
-}
-
-function encodeIco(images) {
-  const header = Buffer.alloc(6)
-  header.writeUInt16LE(0, 0)
-  header.writeUInt16LE(1, 2)
-  header.writeUInt16LE(images.length, 4)
-
-  const entries = []
-  const blobs = []
-  let offset = 6 + images.length * 16
-
-  for (const { size, data } of images) {
-    const entry = Buffer.alloc(16)
-    entry[0] = size >= 256 ? 0 : size
-    entry[1] = size >= 256 ? 0 : size
-    entry[2] = 0
-    entry[3] = 0
-    entry.writeUInt16LE(1, 4)
-    entry.writeUInt16LE(32, 6)
-    entry.writeUInt32LE(data.length, 8)
-    entry.writeUInt32LE(offset, 12)
-    entries.push(entry)
-    blobs.push(data)
-    offset += data.length
-  }
-  return Buffer.concat([header, ...entries, ...blobs])
-}
-
 /* -------------------------------------------------------------------- Run */
 
 mkdirSync(outDir, { recursive: true })
 
-const icoSizes = [16, 24, 32, 48, 64, 128, 256]
-const images = icoSizes.map((size) => {
-  const pixels = renderIcon(size)
-  // Windows attend du DIB en dessous de 64 px, du PNG au-dessus.
-  const data = size >= 64 ? encodePng(pixels, size) : encodeDib(pixels, size)
-  return { size, data }
-})
+// Source unique : un PNG carré haute résolution, redimensionné par png2icons
+// vers toutes les tailles attendues par Windows.
+const master = encodePng(renderIcon(1024), 1024)
 
-writeFileSync(path.join(outDir, 'icon.ico'), encodeIco(images))
+const ico = png2icons.createICO(master, png2icons.BICUBIC, 0, false, true)
+if (!ico) throw new Error("png2icons n'a pas pu produire le .ico")
+
+writeFileSync(path.join(outDir, 'icon.ico'), ico)
 writeFileSync(path.join(outDir, 'icon.png'), encodePng(renderIcon(512), 512))
 writeFileSync(path.join(outDir, 'icon-256.png'), encodePng(renderIcon(256), 256))
 
-console.log(`[audii] icônes générées dans ${path.relative(root, outDir)}`)
+console.log(`[audii] icônes générées dans ${path.relative(root, outDir)} (.ico : ${ico.length} octets)`)
