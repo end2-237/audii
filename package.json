@@ -11,6 +11,7 @@
   "main": "dist/main/index.js",
   "scripts": {
     "icons": "node scripts/gen-icons.mjs",
+    "login-bg": "node scripts/set-login-bg.mjs",
     "dev": "node scripts/dev.mjs",
     "build:main": "node scripts/build-main.mjs",
     "build:renderer": "vite build",

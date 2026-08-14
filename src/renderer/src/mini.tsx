@@ -41,7 +41,7 @@ function Mini(): React.JSX.Element {
         {state?.cover ? (
           <Cover src={state.cover} name={state.title} size={52} radius={26} />
         ) : (
-          <Logo size={34} radius={11} />
+          <Logo size={30} />
         )}
         <span className="bubble-ring" aria-hidden="true" />
       </button>
@@ -59,7 +59,7 @@ function Mini(): React.JSX.Element {
         {state?.cover ? (
           <Cover src={state.cover} name={state.title} size={52} radius={9} />
         ) : (
-          <Logo size={52} radius={12} />
+          <Logo size={40} />
         )}
         <span className="mini-art-open">
           <IconExpand size={15} />

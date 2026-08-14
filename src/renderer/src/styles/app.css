@@ -1800,6 +1800,10 @@ li {
   -webkit-app-region: drag;
 }
 
+/* Panneau d'ambiance : la photo est la couche du dessous, les dégradés
+   au-dessus servent uniquement à garder le texte lisible quel que soit le
+   cadrage de l'image (`cover` recadre selon la hauteur de la fenêtre).
+   Pour changer de visuel, il suffit de remplacer `assets/login-bg.jpg`. */
 .login-aside {
   position: relative;
   display: grid;
@@ -1807,13 +1811,48 @@ li {
   padding: 40px;
   overflow: hidden;
   color: #fff;
+  background-color: #0d0a13;
+}
+
+.login-aside::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('../assets/login-bg.jpg') center / cover no-repeat;
+  /* Lent zoom arrière : la scène respire sans distraire de la saisie. */
+  animation: aside-drift 26s ease-in-out infinite alternate;
+}
+
+.login-aside::after {
+  content: '';
+  position: absolute;
+  inset: 0;
   background:
-    radial-gradient(120% 90% at 20% 10%, hsl(var(--hue) 85% 60% / 0.55) 0%, transparent 60%),
-    linear-gradient(160deg, #1d1330 0%, #0d0a13 100%);
+    radial-gradient(120% 90% at 20% 10%, hsl(var(--hue) 85% 60% / 0.2) 0%, transparent 58%),
+    /* Assombri surtout derrière le texte, en haut à gauche ; la foule et les
+       projecteurs restent lisibles dans le bas du panneau. */
+    linear-gradient(155deg, rgba(11, 8, 16, 0.74) 0%, rgba(11, 8, 16, 0.34) 58%, rgba(11, 8, 16, 0.6) 100%);
+}
+
+@keyframes aside-drift {
+  from {
+    transform: scale(1.09);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-aside::before {
+    animation: none;
+  }
 }
 
 .login-aside-inner {
   position: relative;
+  /* Au-dessus du voile `::after`, qui est peint après les enfants. */
+  z-index: 1;
   max-width: 320px;
   display: flex;
   flex-direction: column;

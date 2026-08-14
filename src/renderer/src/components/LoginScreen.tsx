@@ -54,7 +54,7 @@ export function LoginScreen(): React.JSX.Element {
 
       <div className="login-aside" style={{ '--hue': hue } as React.CSSProperties}>
         <div className="login-aside-inner">
-          <Logo size={54} radius={16} />
+          <Logo size={54} />
           <h1>Audii</h1>
           <p className="login-claim">{t('login.claim')}</p>
           <ul className="login-points">

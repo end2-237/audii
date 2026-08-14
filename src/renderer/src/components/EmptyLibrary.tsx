@@ -8,7 +8,7 @@ export function EmptyLibrary(): React.JSX.Element {
   return (
     <section className="empty-library">
       <div className="empty-logo">
-        <Logo size={64} radius={18} />
+        <Logo size={64} />
       </div>
       <h1>{t('empty.title')}</h1>
       <p>{t('empty.text')}</p>

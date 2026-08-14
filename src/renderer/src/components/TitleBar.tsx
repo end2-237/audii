@@ -43,7 +43,7 @@ export function TitleBar(): React.JSX.Element {
       {platform === 'darwin' && <WindowControls />}
 
       <div className="titlebar-logo">
-        <Logo size={26} radius={8} />
+        <Logo size={26} />
       </div>
 
       <nav className="tabs">

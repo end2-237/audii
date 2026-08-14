@@ -270,35 +270,39 @@ export const IconSparkle = ({ size = 16, className }: IconProps) => (
 )
 
 /**
- * Logo Audii : monogramme « A » dans une tuile arrondie dégradée.
+ * Logo Audii : monogramme « Au ».
  *
- * La lettre est un anneau triangulaire dont la barre transversale déborde à
- * droite, comme une onde qui s'échappe — c'est ce débord qui distingue la
- * marque d'un simple « A » géométrique. Le tracé est identique à celui de
- * l'icône Windows (voir `scripts/gen-icons.mjs`).
+ * Un trait unique d'épaisseur constante trace l'arche du « A », rejoint la
+ * panse du « u » par la barre transversale, et le point du « i » ferme le
+ * mot. Le repère fait 915 × 796 et les coordonnées sont celles du logo
+ * source — les mêmes que dans `scripts/gen-icons.mjs` et le splash, pour que
+ * l'icône Windows et l'interface montrent rigoureusement le même dessin.
+ *
+ * `size` est la hauteur ; la largeur suit le rapport du monogramme.
  */
-export const Logo = ({ size = 26, radius = 8 }: { size?: number; radius?: number }) => {
-  const rx = (radius / size) * 100
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="audii-logo" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FF2D8E" />
-          <stop offset="1" stopColor="#8A2AF6" />
-        </linearGradient>
-      </defs>
-      <rect width="100" height="100" rx={rx} fill="url(#audii-logo)" />
-      {/* Lettre pleine, angles adoucis par la jointure ronde du contour. */}
-      <path d="M50 18 L82 82 L18 82 Z" fill="#fff" stroke="#fff" strokeWidth="7" strokeLinejoin="round" />
-      {/* Contrepoinçon, repeint dans le dégradé de la tuile. */}
-      <path
-        d="M50 42 L67 77 L33 77 Z"
-        fill="url(#audii-logo)"
-        stroke="url(#audii-logo)"
-        strokeWidth="5"
-        strokeLinejoin="round"
-      />
-      <rect x="31" y="62" width="53" height="9" rx="3.5" fill="#fff" />
-    </svg>
-  )
-}
+export const Logo = ({ size = 26 }: { size?: number }) => (
+  <svg
+    width={(size * 915) / 796}
+    height={size}
+    viewBox="0 0 915 796"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <linearGradient id="audii-mark" x1="0" y1="0" x2="1" y2="1">
+        <stop stopColor="#FDB44B" />
+        <stop offset="1" stopColor="#F85C60" />
+      </linearGradient>
+      <linearGradient id="audii-dot" x1="0" y1="0" x2="1" y2="1">
+        <stop stopColor="#F0007A" />
+        <stop offset="1" stopColor="#8E00AE" />
+      </linearGradient>
+    </defs>
+    {/* Un seul tracé, du pied du « A » à la hampe droite du « u ». */}
+    <g stroke="url(#audii-mark)" strokeWidth="135">
+      <path d="M67.5 796V302.5a235 235 0 0 1 470 0V575a153.5 153.5 0 0 0 307 0V463.5" />
+      <path d="M262.5 531h275" />
+    </g>
+    <circle cx="844.5" cy="330" r="67.5" fill="url(#audii-dot)" />
+  </svg>
+)
