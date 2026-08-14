@@ -20,6 +20,29 @@ const expectResume = process.env.AUDII_SMOKE_RESUME === '1'
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
+/**
+ * Journal sur disque. Sous Windows, une application Electron n'est pas
+ * rattachée à une console : sans ce fichier, la CI ne rapporterait qu'un code
+ * de sortie, sans jamais dire ce qui a échoué.
+ */
+const logLines: string[] = []
+
+function record(message: string): void {
+  const line = `[smoke] ${message}`
+  logLines.push(line)
+  console.log(line)
+}
+
+async function flushLog(): Promise<void> {
+  if (!smokeDir) return
+  try {
+    await fs.mkdir(smokeDir, { recursive: true })
+    await fs.writeFile(path.join(smokeDir, 'smoke.log'), `${logLines.join('\n')}\n`, 'utf8')
+  } catch {
+    /* le code de sortie reste la source de vérité */
+  }
+}
+
 async function shoot(window: BrowserWindow, name: string): Promise<void> {
   if (!smokeDir || window.isDestroyed()) return
   const image = await window.webContents.capturePage()
@@ -61,7 +84,7 @@ const seconds = (clock: string | null): number => {
 
 export async function runSmoke(window: BrowserWindow): Promise<void> {
   const failures: string[] = []
-  const log = (message: string): void => console.log(`[smoke] ${message}`)
+  const log = record
   const run = <T>(script: string): Promise<T> => window.webContents.executeJavaScript(script) as Promise<T>
 
   try {
@@ -290,10 +313,12 @@ export async function runSmoke(window: BrowserWindow): Promise<void> {
   }
 
   if (failures.length > 0) {
-    console.error(`[smoke] ÉCHEC :\n - ${failures.join('\n - ')}`)
+    record(`ÉCHEC :\n - ${failures.join('\n - ')}`)
+    await flushLog()
     app.exit(1)
     return
   }
-  console.log('[smoke] OK')
+  record('OK')
+  await flushLog()
   app.exit(0)
 }

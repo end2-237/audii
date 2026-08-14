@@ -27,9 +27,13 @@ const t = (key: MessageKey, params?: Params): string => translate(lang, key, par
 
 registerScheme()
 
-if (!app.requestSingleInstanceLock()) {
-  app.quit()
-}
+/**
+ * Une seule instance à la fois. `app.quit()` ne coupe pas l'exécution du
+ * module : sans ce garde, la seconde instance continuait à enregistrer ses
+ * fenêtres et ses handlers avant de mourir.
+ */
+const isPrimaryInstance = app.requestSingleInstanceLock()
+if (!isPrimaryInstance) app.exit(0)
 
 function broadcast(channel: string, payload: unknown): void {
   for (const win of [mainWindow, splashWindow]) {
@@ -340,25 +344,27 @@ function registerIpc(): void {
   ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() ?? false)
 }
 
-app.whenReady().then(() => {
-  nativeTheme.themeSource = 'dark'
-  registerHandler()
-  registerIpc()
-  createSplash()
-  createMainWindow()
-  void boot()
+if (isPrimaryInstance) {
+  void app.whenReady().then(() => {
+    nativeTheme.themeSource = 'dark'
+    registerHandler()
+    registerIpc()
+    createSplash()
+    createMainWindow()
+    void boot()
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    })
   })
-})
 
-app.on('second-instance', () => {
-  if (!mainWindow) return
-  if (mainWindow.isMinimized()) mainWindow.restore()
-  mainWindow.focus()
-})
+  app.on('second-instance', () => {
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  })
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
+  })
+}

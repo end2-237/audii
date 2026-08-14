@@ -68,6 +68,35 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --win --x64 --publish never
 
+      # Le paquet Linux était vérifié, pas le binaire Windows : on lance
+      # réellement l'exécutable empaqueté avant de publier quoi que ce soit.
+      - name: Génération d'une bibliothèque de test
+        run: node scripts/make-fixtures.mjs "$env:USERPROFILE\Music"
+
+      - name: Lancement du binaire Windows empaqueté
+        env:
+          AUDII_SMOKE: ${{ github.workspace }}\smoke-win
+        run: |
+          $exe = "release\win-unpacked\Audii.exe"
+          if (-not (Test-Path $exe)) {
+            Get-ChildItem release -Recurse -Depth 2 | Select-Object FullName
+            throw "$exe introuvable dans le paquet"
+          }
+          Write-Host "Taille : $((Get-Item $exe).Length) octets"
+          $process = Start-Process -FilePath $exe -PassThru -Wait
+          $log = "$env:AUDII_SMOKE\smoke.log"
+          if (Test-Path $log) { Get-Content $log }
+          Write-Host "Code de sortie : $($process.ExitCode)"
+          if ($process.ExitCode -ne 0) { throw "l'application empaquetée a échoué" }
+
+      - name: Captures Windows
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures-windows
+          path: smoke-win/
+          if-no-files-found: warn
+
       - name: Installateur NSIS
         uses: actions/upload-artifact@v4
         with:
