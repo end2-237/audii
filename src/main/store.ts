@@ -55,6 +55,22 @@ export interface AnalysisCacheEntry {
 
 const analysisFile = new JsonFile<Record<string, AnalysisCacheEntry>>('analysis.json', {})
 
+/**
+ * L'analyse en tâche de fond met à jour la bibliothèque titre par titre.
+ * On coalesce les écritures : le cache mémoire du store reste à jour
+ * immédiatement, seul le passage sur disque est différé.
+ */
+let pendingWrite: NodeJS.Timeout | null = null
+
+function scheduleLibraryWrite(library: Library): void {
+  if (pendingWrite) clearTimeout(pendingWrite)
+  pendingWrite = setTimeout(() => {
+    pendingWrite = null
+    void libraryFile.write(library)
+  }, 4000)
+  pendingWrite.unref?.()
+}
+
 export const store = {
   getSettings: () => settingsFile.read(),
   async setSettings(patch: Partial<Settings>): Promise<Settings> {
@@ -65,6 +81,8 @@ export const store = {
   },
   getLibrary: () => libraryFile.read(),
   setLibrary: (lib: Library) => libraryFile.write(lib),
+  /** Écriture différée, pour les mises à jour à haute fréquence. */
+  saveLibrarySoon: (lib: Library) => scheduleLibraryWrite(lib),
   getAnalysis: () => analysisFile.read(),
   async setAnalysis(id: string, entry: AnalysisCacheEntry): Promise<void> {
     const all = await analysisFile.read()

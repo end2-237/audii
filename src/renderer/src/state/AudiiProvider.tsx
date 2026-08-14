@@ -204,9 +204,12 @@ export function AudiiProvider({ children }: { children: ReactNode }): React.JSX.
 
   const advance = useCallback(
     (direction: 1 | -1) => {
-      const queue = queueRef.current.map((id) => libraryRef.current.tracks.find((t) => t.id === id)).filter(
-        (t): t is Track => Boolean(t)
-      )
+      // Passe par un index : une file de plusieurs milliers de titres ne doit
+      // pas coûter une recherche linéaire par élément.
+      const byId = new Map(libraryRef.current.tracks.map((track) => [track.id, track]))
+      const queue = queueRef.current
+        .map((id) => byId.get(id))
+        .filter((track): track is Track => Boolean(track))
       if (queue.length === 0) return
       const active = currentRef.current
       const settingsNow = settingsRef.current

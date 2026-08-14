@@ -285,7 +285,7 @@ function registerIpc(): void {
     if (track) {
       track.bpmAnalyzed = payload.bpm
       track.energy = payload.energy
-      await store.setLibrary(library)
+      store.saveLibrarySoon(library)
     }
   })
 
