@@ -1,0 +1,100 @@
+name: Build Windows
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Vérifie sur Linux (avec écran virtuel) que l'application démarre, scanne
+  # une vraie bibliothèque audio, lit un fichier et estime son tempo.
+  smoke:
+    name: Test de fumée (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Vérification des types
+        run: npm run typecheck
+
+      - run: npm run build
+
+      - name: Génération d'une bibliothèque de test
+        run: node scripts/make-fixtures.mjs "$HOME/Music"
+
+      - name: Lancement de l'application
+        env:
+          AUDII_SMOKE: ${{ github.workspace }}/smoke
+        run: xvfb-run -a --server-args="-screen 0 1280x800x24" npx electron . --no-sandbox
+
+      - name: Captures d'écran
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures-smoke
+          path: smoke/
+          if-no-files-found: warn
+
+  windows:
+    name: Paquet Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Compilation (main + preload + renderer)
+        run: npm run build
+
+      - name: Empaquetage electron-builder
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: Installateur NSIS
+        uses: actions/upload-artifact@v4
+        with:
+          name: Audii-Setup-Windows
+          path: release/Audii-Setup-*.exe
+          if-no-files-found: error
+
+      - name: Version portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: Audii-Portable-Windows
+          path: release/Audii-*-portable.exe
+          if-no-files-found: error
+
+  release:
+    name: Publication (tag v*)
+    needs: [windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.exe
+          generate_release_notes: true

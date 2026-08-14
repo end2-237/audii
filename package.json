@@ -1,0 +1,38 @@
+{
+  "name": "audii",
+  "version": "0.1.0",
+  "description": "Audii — lecteur audio adaptatif universel (édition Desktop)",
+  "author": {
+    "name": "Buyticle",
+    "email": "contact@buyticle.com"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "dist/main/index.js",
+  "scripts": {
+    "icons": "node scripts/gen-icons.mjs",
+    "dev": "node scripts/dev.mjs",
+    "build:main": "node scripts/build-main.mjs",
+    "build:renderer": "vite build",
+    "build": "npm run icons && npm run build:main && npm run build:renderer",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "start": "npm run build && electron .",
+    "pack:win": "npm run build && electron-builder --win --publish never",
+    "pack:dir": "npm run build && electron-builder --dir --publish never"
+  },
+  "devDependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@types/node": "22.13.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "6.0.5",
+    "electron": "37.10.3",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "music-metadata": "7.14.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "typescript": "5.9.3",
+    "vite": "8.2.1"
+  }
+}

@@ -1,0 +1,52 @@
+appId: com.buyticle.audii
+productName: Audii
+copyright: © ${author} — Audii
+
+directories:
+  output: release
+  buildResources: build
+
+# Tout est bundlé par esbuild/Vite : le paquet ne contient que dist/.
+files:
+  - dist/**/*
+  - package.json
+
+asar: true
+compression: normal
+
+win:
+  icon: build/icon.ico
+  artifactName: ${productName}-${version}-${arch}-${ext}
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Audii
+  deleteAppDataOnUninstall: false
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+  requestExecutionLevel: user
+
+mac:
+  icon: build/icon.png
+  category: public.app-category.music
+  target:
+    - dmg
+    - zip
+
+linux:
+  icon: build/icon.png
+  category: AudioVideo
+  target:
+    - AppImage
