@@ -104,6 +104,84 @@ jobs:
           Write-Host "Code de sortie : $($process.ExitCode)"
           if ($process.ExitCode -ne 0) { throw "l'application empaquetée a échoué" }
 
+      # Vérifier `win-unpacked` ne prouve rien sur l'installateur : c'est un
+      # artefact voisin, pas celui que l'utilisateur exécute. Un installateur
+      # peut poser son désinstalleur et ses raccourcis sans jamais extraire
+      # l'application — le dossier ne contient alors qu'Uninstall.exe et le
+      # raccourci ne mène nulle part. On installe donc pour de vrai, on
+      # inventorie le dossier, et on lance l'application installée.
+      - name: Installation réelle et lancement de l'application installée
+        env:
+          AUDII_SMOKE: ${{ github.workspace }}\smoke-install
+        run: |
+          $setup = Get-ChildItem release\Audii-Setup-*-x64.exe | Select-Object -First 1
+          if (-not $setup) { throw "installateur x64 introuvable" }
+          Write-Host "Installateur : $($setup.Name)"
+
+          # `/S` = mode silencieux NSIS. `perMachine: false` installe pour
+          # l'utilisateur courant, donc sous %LOCALAPPDATA%\Programs.
+          $install = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -PassThru -Wait
+          Write-Host "Code de sortie de l'installateur : $($install.ExitCode)"
+
+          $cible = "$env:LOCALAPPDATA\Programs\Audii"
+          if (-not (Test-Path $cible)) {
+            Write-Host "::error::$cible n'existe pas — rien n'a été installé"
+            Get-ChildItem "$env:LOCALAPPDATA\Programs" -ErrorAction SilentlyContinue |
+              Select-Object FullName
+            throw "dossier d'installation absent"
+          }
+
+          Write-Host "--- contenu de $cible ---"
+          $fichiers = Get-ChildItem $cible -Recurse -File
+          $fichiers | Sort-Object Length -Descending | Select-Object -First 12 |
+            ForEach-Object { Write-Host ("{0,10:N0} o  {1}" -f $_.Length, $_.FullName.Replace($cible, '')) }
+          Write-Host ("--- {0} fichier(s), {1:N0} Mo au total ---" -f $fichiers.Count,
+            (($fichiers | Measure-Object -Property Length -Sum).Sum / 1MB))
+
+          $exe = Join-Path $cible 'Audii.exe'
+          if (-not (Test-Path $exe)) {
+            Write-Host "::error::Audii.exe absent : l'installateur n'a pas extrait l'application"
+            throw "application non extraite"
+          }
+
+          # Le raccourci du menu Démarrer doit pointer sur un fichier existant.
+          $raccourci = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Audii.lnk"
+          if (Test-Path $raccourci) {
+            $cible2 = (New-Object -ComObject WScript.Shell).CreateShortcut($raccourci).TargetPath
+            Write-Host "Raccourci -> $cible2"
+            if (-not (Test-Path $cible2)) { throw "le raccourci ne mène nulle part : $cible2" }
+          } else {
+            Write-Host "::warning::raccourci du menu Démarrer introuvable"
+          }
+
+          $process = Start-Process -FilePath $exe -PassThru -Wait
+          $log = "$env:AUDII_SMOKE\smoke.log"
+          if (Test-Path $log) { Get-Content $log }
+          Write-Host "Code de sortie : $($process.ExitCode)"
+          if ($process.ExitCode -ne 0) { throw "l'application installée a échoué" }
+
+      # Le runner est en x64 : l'installateur ARM64 doit y refuser de
+      # s'installer, et le dire. Sans ce garde-fou il « réussissait » en
+      # ne posant qu'un désinstalleur et un raccourci mort.
+      - name: L'installateur ARM64 refuse une machine x64
+        run: |
+          $setup = Get-ChildItem release\Audii-Setup-*-arm64.exe | Select-Object -First 1
+          if (-not $setup) { throw "installateur ARM64 introuvable" }
+
+          $avant = Get-ChildItem "$env:LOCALAPPDATA\Programs\Audii" -Recurse -File -ErrorAction SilentlyContinue
+          $install = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -PassThru -Wait
+          Write-Host "Code de sortie : $($install.ExitCode)"
+          if ($install.ExitCode -eq 0) {
+            throw "l'installateur ARM64 s'est déclaré satisfait sur une machine x64"
+          }
+
+          # Et il ne doit pas avoir touché à l'installation x64 en place.
+          $apres = Get-ChildItem "$env:LOCALAPPDATA\Programs\Audii" -Recurse -File -ErrorAction SilentlyContinue
+          if ($apres.Count -ne $avant.Count) {
+            throw "l'installation existante a été modifiée ($($avant.Count) -> $($apres.Count) fichiers)"
+          }
+          Write-Host "Refus correct, installation x64 intacte ($($apres.Count) fichiers)"
+
       - name: Captures Windows
         if: always()
         uses: actions/upload-artifact@v4
