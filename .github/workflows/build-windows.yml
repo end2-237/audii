@@ -39,6 +39,12 @@ jobs:
           AUDII_SMOKE: ${{ github.workspace }}/smoke
         run: xvfb-run -a --server-args="-screen 0 1280x800x24" npx electron . --no-sandbox
 
+      # L'estimateur de tempo est le cœur du produit et n'avait aucun garde-fou :
+      # une régression y serait passée inaperçue. Les fixtures portent leur
+      # tempo exact, ce qui donne une vérité de référence.
+      - name: Justesse de l'estimation de tempo
+        run: xvfb-run -a npm run tempo-lab -- "$HOME/Music" --verifier --out tempo-lab.json
+
       - name: Captures d'écran
         if: always()
         uses: actions/upload-artifact@v4

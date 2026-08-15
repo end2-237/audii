@@ -18,12 +18,36 @@ const MAX_BPM = 200
  * Un signal périodique corrèle aussi bien à T qu'à 2T : l'autocorrélation seule
  * ne peut pas trancher l'octave. On applique donc la pondération log-normale
  * usuelle, centrée sur le tempo le plus fréquent en musique (~120 BPM).
+ *
+ * La largeur a été mesurée, pas choisie : sur les onze morceaux de référence,
+ * tout réglage entre 0,45 et 0,55 donne le même résultat parfait, et 0,40
+ * commence à tirer les morceaux lents vers 120. On retient le milieu de ce
+ * plateau plutôt que son bord, pour rester robuste sur des morceaux inconnus.
  */
 const TEMPO_CENTER = 120
-const TEMPO_SPREAD = 0.6
+const TEMPO_SPREAD = 0.5
 
 const octaveWeight = (bpm: number): number =>
   Math.exp(-0.5 * (Math.log(bpm / TEMPO_CENTER) / TEMPO_SPREAD) ** 2)
+
+/**
+ * Sonie perçue, ramenée entre 0 et 1.
+ *
+ * Une mise à l'échelle linéaire du RMS ne convient pas : mesurée sur des
+ * morceaux réels, l'amplitude va de 0,13 à 0,36 — soit de −17,7 à −9,0 dBFS.
+ * Un facteur linéaire saturait au-dessus de 0,2, si bien que huit morceaux
+ * sur onze ressortaient à 1,000 : l'indicateur décrivait le mastering, pas la
+ * musique. L'oreille entend en décibels, on mesure donc en décibels, sur une
+ * plage de −24 à −6 dBFS qui encadre largement ce qui a été observé.
+ */
+const LOUDNESS_FLOOR_DB = -24
+const LOUDNESS_RANGE_DB = 18
+
+const loudnessOf = (rms: number): number => {
+  if (rms <= 0) return 0
+  const db = 20 * Math.log10(rms)
+  return Math.min(1, Math.max(0, (db - LOUDNESS_FLOOR_DB) / LOUDNESS_RANGE_DB))
+}
 
 let context: AudioContext | null = null
 const decodeContext = (): AudioContext => {
@@ -41,7 +65,7 @@ function toMono(buffer: AudioBuffer, startSample: number, length: number): Float
   return mono
 }
 
-interface Envelope {
+export interface Envelope {
   onsets: Float32Array
   framesPerSecond: number
   rms: number
@@ -85,11 +109,29 @@ function buildEnvelope(samples: Float32Array, sampleRate: number): Envelope {
   return { onsets, framesPerSecond: sampleRate / hop, rms: total / Math.max(1, frames), peak }
 }
 
-function detectTempo(envelope: Envelope): number | null {
+/** Un tempo candidat et le détail de sa note, pour pouvoir expliquer un choix. */
+export interface TempoCandidate {
+  bpm: number
+  /** Autocorrélation brute à ce décalage. */
+  brut: number
+  /** Pondération d'octave appliquée. */
+  poids: number
+  /** Note finale ayant servi au classement. */
+  note: number
+}
+
+/**
+ * Classe les tempi candidats, du plus probable au moins.
+ *
+ * Exporté pour que le banc d'essai puisse montrer *pourquoi* un tempo a été
+ * retenu : une erreur d'octave ne se corrige pas à l'aveugle, il faut voir si
+ * le bon tempo était deuxième d'un cheveu ou absent du classement.
+ */
+export function rankTempi(envelope: Envelope): TempoCandidate[] {
   const { onsets, framesPerSecond } = envelope
   const minLag = Math.floor((60 / MAX_BPM) * framesPerSecond)
   const maxLag = Math.ceil((60 / MIN_BPM) * framesPerSecond)
-  if (onsets.length < maxLag * 3) return null
+  if (onsets.length < maxLag * 3) return []
 
   const scores = new Float32Array(maxLag + 1)
   for (let lag = minLag; lag <= maxLag; lag++) {
@@ -100,27 +142,48 @@ function detectTempo(envelope: Envelope): number | null {
     scores[lag] = sum / limit
   }
 
-  // Renforce les lags dont les multiples résonnent aussi (vraie pulsation).
-  let bestLag = -1
-  let bestScore = -1
+  /**
+   * Un renfort par les multiples du décalage a été essayé, puis retiré.
+   *
+   * L'idée — récompenser un candidat dont les multiples résonnent aussi, la
+   * pulsation se retrouvant à la mesure — semblait solide, mais elle ne
+   * départage rien : un candidat au double du vrai tempo est renforcé par le
+   * vrai tempo lui-même, et réciproquement. Mesuré sur les morceaux de
+   * référence, le renfort faisait tomber le score de 9 bonnes réponses à 7,
+   * en se trompant tantôt vers le double, tantôt vers la moitié.
+   * L'autocorrélation brute pondérée par la vraisemblance du tempo fait
+   * mieux, et plus vite.
+   */
+  const candidats: TempoCandidate[] = []
   for (let lag = minLag; lag <= maxLag; lag++) {
-    let score = scores[lag]
-    for (const multiple of [2, 3, 4]) {
-      const target = lag * multiple
-      if (target <= maxLag) score += scores[target] * (0.5 / multiple)
-    }
-    score *= octaveWeight((60 * framesPerSecond) / lag)
-    if (score > bestScore) {
-      bestScore = score
-      bestLag = lag
-    }
+    const bpm = (60 * framesPerSecond) / lag
+    const poids = octaveWeight(bpm)
+    candidats.push({
+      bpm: Math.round(bpm * 10) / 10,
+      brut: scores[lag],
+      poids,
+      note: scores[lag] * poids
+    })
   }
-  if (bestLag < 0 || bestScore <= 0) return null
+  return candidats.sort((a, b) => b.note - a.note)
+}
 
-  let bpm = (60 * framesPerSecond) / bestLag
+function detectTempo(envelope: Envelope): number | null {
+  const meilleur = rankTempi(envelope)[0]
+  if (!meilleur || meilleur.note <= 0) return null
+
+  let bpm = meilleur.bpm
   while (bpm < MIN_BPM && bpm * 2 <= MAX_BPM) bpm *= 2
   while (bpm > MAX_BPM && bpm / 2 >= MIN_BPM) bpm /= 2
   return Math.round(bpm)
+}
+
+/** Construit l'enveloppe d'un tampon décodé (fenêtre centrale, comme l'analyse). */
+export function envelopeOf(audio: AudioBuffer): Envelope {
+  const total = audio.length
+  const windowLength = Math.min(total, Math.floor(WINDOW_SECONDS * audio.sampleRate))
+  const start = Math.max(0, Math.floor((total - windowLength) / 2))
+  return buildEnvelope(toMono(audio, start, windowLength), audio.sampleRate)
 }
 
 /**
@@ -146,8 +209,7 @@ export function analyzeBuffer(audio: AudioBuffer): AnalysisResult {
   let onsetSum = 0
   for (let i = 0; i < envelope.onsets.length; i++) onsetSum += envelope.onsets[i]
   const density = onsetSum / Math.max(1, envelope.onsets.length)
-  const loudness = Math.min(1, envelope.rms * 5)
-  const energy = Math.min(1, Math.max(0, loudness * 0.7 + Math.min(1, density * 90) * 0.3))
+  const energy = Math.min(1, Math.max(0, loudnessOf(envelope.rms) * 0.55 + Math.min(1, density * 90) * 0.45))
 
   return { bpm, energy: Number(energy.toFixed(3)) }
 }

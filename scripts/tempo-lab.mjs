@@ -30,12 +30,14 @@ const EXTENSIONS = ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.oga', '.o
 /* --------------------------------------------------------------- arguments */
 
 const args = process.argv.slice(2)
+const verifier = args.includes('--verifier')
 const outIndex = args.indexOf('--out')
 const outFile = outIndex >= 0 ? args[outIndex + 1] : path.join(root, 'tempo-lab.json')
-const entrees = (outIndex >= 0 ? [...args.slice(0, outIndex), ...args.slice(outIndex + 2)] : args).filter(Boolean)
+const entrees = (outIndex >= 0 ? [...args.slice(0, outIndex), ...args.slice(outIndex + 2)] : args)
+  .filter((a) => Boolean(a) && a !== '--verifier')
 
 if (entrees.length === 0) {
-  console.error('usage : npm run tempo-lab -- <dossier|fichiers…> [--out rapport.json]')
+  console.error('usage : npm run tempo-lab -- <dossier|fichiers…> [--out rapport.json] [--verifier]')
   process.exit(1)
 }
 
@@ -82,7 +84,7 @@ await build({
 
 writeFileSync(
   path.join(labDir, 'input.json'),
-  JSON.stringify({ fichiers, sortie: path.resolve(outFile) })
+  JSON.stringify({ fichiers, sortie: path.resolve(outFile), verifier })
 )
 
 writeFileSync(
@@ -96,7 +98,7 @@ writeFileSync(
 
 writeFileSync(
   path.join(labDir, 'lab.js'),
-  `import { analyzeBuffer } from './analyze.js'
+  `import { analyzeBuffer, rankTempi, envelopeOf } from './analyze.js'
 import { styleOf } from './style.js'
 
 const fs = require('node:fs')
@@ -106,7 +108,7 @@ const mm = require(${JSON.stringify(path.join(root, 'node_modules/music-metadata
 const journal = document.getElementById('journal')
 const dire = (t) => { journal.textContent += t + '\\n'; console.log(t) }
 
-const { fichiers, sortie } = JSON.parse(fs.readFileSync(${JSON.stringify(path.join(labDir, 'input.json'))}, 'utf8'))
+const { fichiers, sortie, verifier } = JSON.parse(fs.readFileSync(${JSON.stringify(path.join(labDir, 'input.json'))}, 'utf8'))
 const contexte = new AudioContext()
 const resultats = []
 
@@ -143,6 +145,23 @@ for (const [i, fichier] of fichiers.entries()) {
     ligne.analyseMs = Math.round(performance.now() - t0)
     ligne.bpmEstime = r.bpm
     ligne.energie = r.energy
+
+    // Les cinq meilleurs candidats : sans eux, une erreur d'octave se corrige
+    // à l'aveugle. On veut savoir si le bon tempo était deuxième ou absent.
+    const env = envelopeOf(audio)
+    ligne.rms = Number(env.rms.toExponential(3))
+    ligne.crete = Number(env.peak.toFixed(3))
+    const classement = rankTempi(env)
+    ligne.candidats = classement.slice(0, 5).map((c) => ({
+      bpm: c.bpm, brut: Number(c.brut.toExponential(3)),
+      poids: Number(c.poids.toFixed(3)), note: Number(c.note.toExponential(3))
+    }))
+    if (ligne.bpmTag) {
+      // Rang du tempo du tag (à 3 % près) dans le classement complet.
+      const i = classement.findIndex((c) => Math.abs(c.bpm - ligne.bpmTag) / ligne.bpmTag < 0.03)
+      ligne.rangDuTag = i < 0 ? null : i + 1
+      if (i >= 0) ligne.noteDuTag = Number(classement[i].note.toExponential(3))
+    }
 
     ligne.style = styleOf({
       genre: ligne.genre, artist: ligne.artiste, album: ligne.album, folder: path.dirname(fichier)
@@ -182,7 +201,35 @@ const rapport = {
 }
 fs.writeFileSync(sortie, JSON.stringify(rapport, null, 2))
 dire('\\n--- rapport écrit : ' + sortie + ' ---')
-require('electron').ipcRenderer.send('lab:fini')
+/**
+ * Mode garde-fou : les fixtures synthétiques portent leur tempo dans leurs
+ * métadonnées, ce qui donne une vérité de référence exacte. Toute dérive de
+ * l'estimateur fait échouer la commande — c'est ce qui manquait quand une
+ * régression pouvait passer inaperçue.
+ */
+let sortieCode = 0
+if (verifier) {
+  const ATTENDUS = { 'Slow Motion': 72, 'Night Drive': 92, 'Golden Hour': 104, 'Deep Work': 110,
+    'Flow State': 118, 'Push Harder': 128, 'Sprint': 150, 'Cooldown': 88 }
+  const fautes = []
+  let verifies = 0
+  for (const r of resultats) {
+    const cle = Object.keys(ATTENDUS).find((k) => (r.titre || r.fichier).includes(k))
+    if (!cle) continue
+    verifies++
+    const attendu = ATTENDUS[cle]
+    if (!r.bpmEstime) { fautes.push(cle + ' : aucun tempo estimé'); continue }
+    const ecart = Math.abs(r.bpmEstime - attendu)
+    const octave = Math.abs(r.bpmEstime - 2 * attendu) <= 4 || Math.abs(2 * r.bpmEstime - attendu) <= 4
+    if (octave) fautes.push(cle + ' : erreur d octave, ' + attendu + ' -> ' + r.bpmEstime)
+    else if (ecart > 2) fautes.push(cle + ' : ' + attendu + ' attendu, ' + r.bpmEstime + ' obtenu')
+  }
+  dire('\\n--- vérification : ' + (verifies - fautes.length) + '/' + verifies + ' morceaux justes ---')
+  for (const f of fautes) dire('  ÉCHEC ' + f)
+  if (verifies === 0) { dire('  ÉCHEC aucune fixture reconnue'); sortieCode = 1 }
+  if (fautes.length > 0) sortieCode = 1
+}
+require('electron').ipcRenderer.send('lab:fini', sortieCode)
 `
 )
 
@@ -199,7 +246,7 @@ app.whenReady().then(() => {
   })
   w.loadFile(${JSON.stringify(path.join(labDir, 'lab.html'))})
   w.webContents.on('console-message', (_e, _l, m) => console.log(m))
-  ipcMain.on('lab:fini', () => app.exit(0))
+  ipcMain.on('lab:fini', (_e, code) => app.exit(code ?? 0))
 })
 `
 )
