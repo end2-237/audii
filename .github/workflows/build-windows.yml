@@ -154,6 +154,18 @@ jobs:
             Write-Host "::warning::raccourci du menu Démarrer introuvable"
           }
 
+          # Le test de fumée part du principe qu'il découvre une machine
+          # vierge : il attend l'écran de connexion, un tri qu'il est le
+          # premier à inverser, un titre qu'il est le premier à aimer. Le
+          # lancement précédent a laissé son profil ; sans ce ménage, le
+          # second échouerait sur l'état du premier et non sur un défaut.
+          foreach ($profil in @("$env:APPDATA\Audii", "$env:APPDATA\audii")) {
+            if (Test-Path $profil) {
+              Remove-Item $profil -Recurse -Force
+              Write-Host "Profil précédent supprimé : $profil"
+            }
+          }
+
           $process = Start-Process -FilePath $exe -PassThru -Wait
           $log = "$env:AUDII_SMOKE\smoke.log"
           if (Test-Path $log) { Get-Content $log }
