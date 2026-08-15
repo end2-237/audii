@@ -123,6 +123,35 @@ function detectTempo(envelope: Envelope): number | null {
   return Math.round(bpm)
 }
 
+/**
+ * Analyse un tampon audio déjà décodé.
+ *
+ * Séparé de `analyzeTrack` pour une raison précise : c'est ici qu'est toute
+ * l'intelligence, et c'est donc ici qu'il faut pouvoir mesurer la justesse.
+ * Un banc d'essai qui réimplémenterait l'estimateur validerait sa copie, pas
+ * le produit ; en passant par cette fonction, il éprouve le code qui tourne
+ * réellement chez l'utilisateur.
+ */
+export function analyzeBuffer(audio: AudioBuffer): AnalysisResult {
+  // On analyse une fenêtre au cœur du morceau (évite intro et fondu final).
+  const total = audio.length
+  const windowLength = Math.min(total, Math.floor(WINDOW_SECONDS * audio.sampleRate))
+  const start = Math.max(0, Math.floor((total - windowLength) / 2))
+  const mono = toMono(audio, start, windowLength)
+
+  const envelope = buildEnvelope(mono, audio.sampleRate)
+  const bpm = detectTempo(envelope)
+
+  // Énergie : combinaison loudness + densité d'attaques, bornée à 0..1.
+  let onsetSum = 0
+  for (let i = 0; i < envelope.onsets.length; i++) onsetSum += envelope.onsets[i]
+  const density = onsetSum / Math.max(1, envelope.onsets.length)
+  const loudness = Math.min(1, envelope.rms * 5)
+  const energy = Math.min(1, Math.max(0, loudness * 0.7 + Math.min(1, density * 90) * 0.3))
+
+  return { bpm, energy: Number(energy.toFixed(3)) }
+}
+
 /** Analyse un morceau ; renvoie `null` si le fichier n'est pas exploitable. */
 export async function analyzeTrack(track: Track): Promise<AnalysisResult | null> {
   if (track.size > MAX_BYTES) return null
@@ -130,25 +159,7 @@ export async function analyzeTrack(track: Track): Promise<AnalysisResult | null>
     const response = await fetch(track.url)
     if (!response.ok) return null
     const bytes = await response.arrayBuffer()
-    const audio = await decodeContext().decodeAudioData(bytes)
-
-    // On analyse une fenêtre au cœur du morceau (évite intro et fondu final).
-    const total = audio.length
-    const windowLength = Math.min(total, Math.floor(WINDOW_SECONDS * audio.sampleRate))
-    const start = Math.max(0, Math.floor((total - windowLength) / 2))
-    const mono = toMono(audio, start, windowLength)
-
-    const envelope = buildEnvelope(mono, audio.sampleRate)
-    const bpm = detectTempo(envelope)
-
-    // Énergie : combinaison loudness + densité d'attaques, bornée à 0..1.
-    let onsetSum = 0
-    for (let i = 0; i < envelope.onsets.length; i++) onsetSum += envelope.onsets[i]
-    const density = onsetSum / Math.max(1, envelope.onsets.length)
-    const loudness = Math.min(1, envelope.rms * 5)
-    const energy = Math.min(1, Math.max(0, loudness * 0.7 + Math.min(1, density * 90) * 0.3))
-
-    return { bpm, energy: Number(energy.toFixed(3)) }
+    return analyzeBuffer(await decodeContext().decodeAudioData(bytes))
   } catch {
     return null
   }

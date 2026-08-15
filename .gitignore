@@ -11,3 +11,6 @@ smoke/
 
 # Sortie du build de la landing (regénérée par `npm run landing`).
 web/
+
+# Sortie du banc d’essai tempo.
+tempo-lab.json

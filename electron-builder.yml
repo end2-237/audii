@@ -9,6 +9,9 @@ directories:
 # Tout est bundlé par esbuild/Vite : le paquet ne contient que dist/.
 files:
   - dist/**/*
+  # Le banc d'essai du tempo compile dans dist/ mais n'a rien à faire dans le
+  # produit : il ouvre une fenêtre sans isolation, réservée au développement.
+  - '!dist/lab'
   - package.json
 
 asar: true
